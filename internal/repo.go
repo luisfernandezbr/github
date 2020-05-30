@@ -3,7 +3,6 @@ package internal
 import (
 	"time"
 
-	"github.com/pinpt/go-common/datamodel"
 	"github.com/pinpt/go-common/datetime"
 	"github.com/pinpt/integration-sdk/sourcecode"
 )
@@ -26,7 +25,7 @@ type repository struct {
 	Pullrequests  pullrequests `json:"pullRequests"`
 }
 
-func (r repository) ToModel(customerID string) datamodel.Model {
+func (r repository) ToModel(customerID string) *sourcecode.Repo {
 	repo := &sourcecode.Repo{}
 	repo.ID = sourcecode.NewRepoID(customerID, refType, repo.ID)
 	repo.CustomerID = customerID

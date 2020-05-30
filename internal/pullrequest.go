@@ -4,34 +4,33 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pinpt/go-common/datamodel"
 	"github.com/pinpt/go-common/datetime"
 	"github.com/pinpt/integration-sdk/sourcecode"
 )
 
 type pullrequest struct {
-	ID          string    `json:"id"`
-	Body        string    `json:"bodyHTML"`
-	URL         string    `json:"url"`
-	Closed      bool      `json:"closed"`
-	Draft       bool      `json:"draft"`
-	Locked      bool      `json:"locked"`
-	Merged      bool      `json:"merged"`
-	Number      int       `json:"number"`
-	State       string    `json:"state"`
-	Title       string    `json:"title"`
-	CreatedAt   time.Time `json:"createdAt"`
-	UpdatedAt   time.Time `json:"updatedAt"`
-	MergedAt    time.Time `json:"mergedAt"`
-	Author      author    `json:"author"`
-	Branch      string    `json:"branch"`
-	MergeCommit oidProp   `json:"mergeCommit"`
-	MergedBy    author    `json:"mergedBy"`
-	Commits     commits   `json:"commits"`
-	Reviews     reviews   `json:"reviews"`
+	ID          string             `json:"id"`
+	Body        string             `json:"bodyHTML"`
+	URL         string             `json:"url"`
+	Closed      bool               `json:"closed"`
+	Draft       bool               `json:"draft"`
+	Locked      bool               `json:"locked"`
+	Merged      bool               `json:"merged"`
+	Number      int                `json:"number"`
+	State       string             `json:"state"`
+	Title       string             `json:"title"`
+	CreatedAt   time.Time          `json:"createdAt"`
+	UpdatedAt   time.Time          `json:"updatedAt"`
+	MergedAt    time.Time          `json:"mergedAt"`
+	Author      author             `json:"author"`
+	Branch      string             `json:"branch"`
+	MergeCommit oidProp            `json:"mergeCommit"`
+	MergedBy    author             `json:"mergedBy"`
+	Commits     pullrequestcommits `json:"commits"`
+	Reviews     reviews            `json:"reviews"`
 }
 
-func (pr pullrequest) ToModel(customerID string, repoName string, repoID string) datamodel.Model {
+func (pr pullrequest) ToModel(customerID string, repoName string, repoID string) *sourcecode.PullRequest {
 	// FIXME: implement the remaining fields
 	pullrequest := &sourcecode.PullRequest{}
 	pullrequest.ID = sourcecode.NewPullRequestID(customerID, pr.ID, refType, repoID)

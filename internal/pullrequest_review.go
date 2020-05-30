@@ -3,7 +3,6 @@ package internal
 import (
 	"time"
 
-	"github.com/pinpt/go-common/datamodel"
 	"github.com/pinpt/go-common/datetime"
 	"github.com/pinpt/integration-sdk/sourcecode"
 )
@@ -22,7 +21,7 @@ type review struct {
 	URL       string    `json:"url"`
 }
 
-func (r review) ToModel(customerID string, repoID string, prID string) datamodel.Model {
+func (r review) ToModel(customerID string, repoID string, prID string) *sourcecode.PullRequestReview {
 	prreview := &sourcecode.PullRequestReview{}
 	prreview.CustomerID = customerID
 	prreview.ID = sourcecode.NewPullRequestReviewID(customerID, r.ID, refType, repoID)

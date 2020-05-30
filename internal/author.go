@@ -20,3 +20,15 @@ func (a author) RefID() string {
 	}
 	return a.Login
 }
+
+type gitUser struct {
+	Name   string `json:"name"`
+	Email  string `json:"email"`
+	Avatar string `json:"avatarUrl"`
+	User   author `json:"user"`
+}
+
+func (a gitUser) RefID() string {
+	// FIXME
+	return a.User.Login
+}

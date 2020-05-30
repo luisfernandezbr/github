@@ -2,7 +2,6 @@ package internal
 
 import (
 	"math/rand"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -123,7 +122,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 	}
 	jobs := make([]job, 0)
 	started := time.Now()
-	var repoCount, prCount, reviewCount int
+	var repoCount, prCount, reviewCount, commitCount int
 	for _, orgnode := range allorgs.Viewer.Organizations.Nodes {
 		if !orgnode.IsMember {
 			continue
@@ -160,6 +159,16 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 					if prnode.Reviews.PageInfo.HasNextPage {
 						// TODO: queue
 					}
+					for _, commitnode := range prnode.Commits.Nodes {
+						prcommit := commitnode.Commit.ToModel(export.CustomerID(), repo.GetID(), pullrequest.BranchID)
+						if err := pipe.Write(prcommit); err != nil {
+							return err
+						}
+						commitCount++
+					}
+					if prnode.Commits.PageInfo.HasNextPage {
+						// TODO: queue
+					}
 				}
 				if node.Pullrequests.PageInfo.HasNextPage {
 					tok := strings.Split(node.Name, "/")
@@ -179,11 +188,11 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 			variables["after"] = result.Organization.Repositories.PageInfo.EndCursor
 		}
 	}
-	log.Info(g.logger, "initial export completed", "duration", time.Since(started), "repoCount", repoCount, "prCount", prCount, "reviewCount", reviewCount)
+	log.Info(g.logger, "initial export completed", "duration", time.Since(started), "repoCount", repoCount, "prCount", prCount, "reviewCount", reviewCount, "commitCount", commitCount)
 
 	// now cycle through any pending jobs after the first pass
 	var wg sync.WaitGroup
-	var maxSize = runtime.NumCPU()
+	var maxSize = 2
 	jobch := make(chan job, maxSize*5)
 	errors := make(chan error, maxSize)
 	// run our jobs in parallel but we're going to run the graphql request in single threaded mode to try

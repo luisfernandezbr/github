@@ -69,31 +69,29 @@ query GetPullRequests($name: String!, $owner: String!, $first: Int!, $after: Str
 				}
 				mergedBy {
 					avatarUrl
-					login
 					...on User {
 						id
+						login
 						email
 						name
 					}
 					...on Bot {
-						id
 						boturl: url
 					}
 				}
 				author {
 					avatarUrl
-					login
 					...on User {
 						id
+						login
 						email
 						name
 					}
 					...on Bot {
-						id
 						boturl: url
 					}
 				}
-				commits(first:100) {
+				commits(first: 10) {
 					totalCount
 					pageInfo {
 						hasNextPage
@@ -102,6 +100,29 @@ query GetPullRequests($name: String!, $owner: String!, $first: Int!, $after: Str
 					nodes {
 						commit {
 							sha: oid
+							message
+							authoredDate
+							additions
+							deletions
+							url
+							author {
+								avatarUrl
+								email
+								name
+								user {
+									id
+									login
+								}
+							}
+							committer {
+								avatarUrl
+								email
+								name
+								user {
+									id
+									login
+								}
+							}
 						}
 					}
 				}
@@ -113,14 +134,13 @@ query GetPullRequests($name: String!, $owner: String!, $first: Int!, $after: Str
 						url
 						author {
 							avatarUrl
-							login
 							...on User {
 								id
+								login
 								email
 								name
 							}
 							...on Bot {
-								id
 								boturl: url
 							}
 						}
@@ -222,31 +242,29 @@ query GetAllData($login: String!, $first: Int!, $after: String) {
 						}
 						mergedBy {
 							avatarUrl
-							login
 							...on User {
 								id
+								login
 								email
 								name
 							}
 							...on Bot {
-								id
-								boturl: url
-							}
-						}		
-						author {
-							avatarUrl
-							login
-							...on User {
-								id
-								email
-								name
-							}
-							...on Bot {
-								id
 								boturl: url
 							}
 						}
-						commits(first:100) {
+						author {
+							avatarUrl
+							...on User {
+								id
+								login
+								email
+								name
+							}
+							...on Bot {
+								boturl: url
+							}
+						}
+						commits(first: 1) {
 							totalCount
 							pageInfo {
 								hasNextPage
@@ -255,6 +273,29 @@ query GetAllData($login: String!, $first: Int!, $after: String) {
 							nodes {
 								commit {
 									sha: oid
+									message
+									authoredDate
+									additions
+									deletions
+									url
+									author {
+										avatarUrl
+										email
+										name
+										user {
+											id
+											login
+										}
+									}
+									committer {
+										avatarUrl
+										email
+										name
+										user {
+											id
+											login
+										}
+									}
 								}
 							}
 						}
@@ -266,14 +307,13 @@ query GetAllData($login: String!, $first: Int!, $after: String) {
 								url
 								author {
 									avatarUrl
-									login
 									...on User {
 										id
+										login
 										email
 										name
 									}
 									...on Bot {
-										id
 										boturl: url
 									}
 								}
