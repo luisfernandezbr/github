@@ -253,14 +253,14 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 			}
 			retryCount = 0
 			for _, node := range result.Organization.Repositories.Nodes {
-				if node.IsArchived {
-					// skip archived for now
-					continue
-				}
 				repoCount++
 				repo := node.ToModel(customerID)
 				if err := pipe.Write(repo); err != nil {
 					return err
+				}
+				if node.IsArchived {
+					// skip archived for now (but still send the repo)
+					continue
 				}
 				for _, prnode := range node.Pullrequests.Nodes {
 					pullrequest := prnode.ToModel(customerID, node.Name, repo.ID)
