@@ -23,7 +23,7 @@ type pullrequestcomment struct {
 	Body      string    `json:"bodyHTML"`
 }
 
-func (c pullrequestcomment) ToModel(customerID string, repoID string, pullRequestID string) *sourcecode.PullRequestComment {
+func (c pullrequestcomment) ToModel(userManager *UserManager, customerID string, repoID string, pullRequestID string) *sourcecode.PullRequestComment {
 	comment := &sourcecode.PullRequestComment{}
 	comment.CustomerID = customerID
 	comment.RepoID = repoID
@@ -46,5 +46,6 @@ func (c pullrequestcomment) ToModel(customerID string, repoID string, pullReques
 		Offset:  ud.Offset,
 	}
 	comment.UserRefID = c.Author.RefID(customerID)
+	userManager.emitAuthor(c.Author)
 	return comment
 }

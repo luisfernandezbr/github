@@ -21,7 +21,7 @@ type pullrequestreview struct {
 	URL       string    `json:"url"`
 }
 
-func (r pullrequestreview) ToModel(customerID string, repoID string, prID string) *sourcecode.PullRequestReview {
+func (r pullrequestreview) ToModel(userManager *UserManager, customerID string, repoID string, prID string) *sourcecode.PullRequestReview {
 	prreview := &sourcecode.PullRequestReview{}
 	prreview.CustomerID = customerID
 	prreview.ID = sourcecode.NewPullRequestReviewID(customerID, r.ID, refType, repoID)
@@ -49,5 +49,6 @@ func (r pullrequestreview) ToModel(customerID string, repoID string, prID string
 		prreview.State = sourcecode.PullRequestReviewStateDismissed
 	}
 	prreview.UserRefID = r.Author.RefID(customerID)
+	userManager.emitAuthor(r.Author)
 	return prreview
 }

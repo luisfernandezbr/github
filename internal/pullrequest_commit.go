@@ -18,7 +18,7 @@ type pullrequestCommit struct {
 	Committer gitUser   `json:"committer"`
 }
 
-func (c pullrequestCommit) ToModel(customerID string, repoID string, prID string) *sourcecode.PullRequestCommit {
+func (c pullrequestCommit) ToModel(userManager *UserManager, customerID string, repoID string, prID string) *sourcecode.PullRequestCommit {
 	commit := &sourcecode.PullRequestCommit{}
 	commit.CustomerID = customerID
 	commit.RepoID = repoID
@@ -39,6 +39,8 @@ func (c pullrequestCommit) ToModel(customerID string, repoID string, prID string
 		Rfc3339: dt.Rfc3339,
 		Offset:  dt.Offset,
 	}
+	userManager.emitGitUser(c.Author)
+	userManager.emitGitUser(c.Committer)
 	return commit
 }
 

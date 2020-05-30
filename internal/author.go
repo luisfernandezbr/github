@@ -1,6 +1,16 @@
 package internal
 
-import "github.com/pinpt/go-common/hash"
+import (
+	"strings"
+
+	"github.com/pinpt/go-common/hash"
+	ps "github.com/pinpt/go-common/strings"
+	"github.com/pinpt/integration-sdk/sourcecode"
+)
+
+func isBot(name string) bool {
+	return strings.HasSuffix(name, "[bot]") || strings.HasSuffix(name, "-bot") || strings.HasSuffix(name, " Bot") || name == "GitHub"
+}
 
 type author struct {
 	ID     string `json:"id"`
@@ -10,6 +20,36 @@ type author struct {
 	Login  string `json:"login"`
 	URL    string `json:"url"`
 	Type   string `json:"type"`
+}
+
+func (a author) ToModel(customerID string) *sourcecode.User {
+	user := &sourcecode.User{}
+	user.CustomerID = customerID
+	user.RefID = a.RefID(customerID)
+	user.RefType = refType
+	user.ID = sourcecode.NewUserID(customerID, refType, user.RefID)
+	user.URL = ps.Pointer(a.URL)
+	user.AvatarURL = ps.Pointer(a.Avatar)
+	user.Email = ps.Pointer(a.Email)
+	if user.Email != nil {
+		id := hash.Values(customerID, a.Email)
+		if id != user.RefID {
+			user.AssociatedRefID = ps.Pointer(id)
+		}
+	}
+	user.Name = a.Name
+	switch a.Type {
+	case "Bot":
+		user.Type = sourcecode.UserTypeBot
+	case "User":
+		user.Type = sourcecode.UserTypeHuman
+		user.Username = ps.Pointer(a.Login)
+	case "Mannequin":
+	}
+	if user.RefID == "" || isBot(a.Name) {
+		user.Type = sourcecode.UserTypeBot
+	}
+	return user
 }
 
 func (a author) RefID(customerID string) string {
@@ -42,5 +82,34 @@ func (a gitUser) RefID(customerID string) string {
 	if a.Email != "" {
 		return hash.Values(customerID, a.Email)
 	}
-	return a.User.Login
+	return ""
+}
+
+func (a gitUser) ToModel(customerID string) *sourcecode.User {
+	user := &sourcecode.User{}
+	user.CustomerID = customerID
+	user.RefID = a.RefID(customerID)
+	user.RefType = refType
+	if a.Email != "" {
+		id := hash.Values(customerID, a.Email)
+		if id != user.RefID {
+			user.AssociatedRefID = ps.Pointer(id)
+		}
+	}
+	user.URL = ps.Pointer(a.User.URL)
+	user.AvatarURL = ps.Pointer(a.Avatar)
+	user.Email = ps.Pointer(a.Email)
+	user.Name = a.Name
+	switch a.User.Type {
+	case "Bot":
+		user.Type = sourcecode.UserTypeBot
+	case "User":
+		user.Type = sourcecode.UserTypeHuman
+		user.Username = ps.Pointer(a.User.Login)
+	case "Mannequin":
+	}
+	if user.RefID == "" || isBot(a.Name) {
+		user.Type = sourcecode.UserTypeBot
+	}
+	return user
 }

@@ -52,7 +52,7 @@ func setPullRequestCommits(pullrequest *sourcecode.PullRequest, commits []*sourc
 	}
 }
 
-func (pr pullrequest) ToModel(customerID string, repoName string, repoID string) *sourcecode.PullRequest {
+func (pr pullrequest) ToModel(userManager *UserManager, customerID string, repoName string, repoID string) *sourcecode.PullRequest {
 	// FIXME: implement the remaining fields
 	pullrequest := &sourcecode.PullRequest{}
 	pullrequest.ID = sourcecode.NewPullRequestID(customerID, pr.ID, refType, repoID)
@@ -65,6 +65,7 @@ func (pr pullrequest) ToModel(customerID string, repoName string, repoID string)
 	pullrequest.Description = pr.Body
 	pullrequest.Draft = pr.Draft
 	pullrequest.CreatedByRefID = pr.Author.RefID(customerID)
+	userManager.emitAuthor(pr.Author)
 	pullrequest.BranchName = pr.Branch
 	pullrequest.Identifier = fmt.Sprintf("%s#%d", repoName, pr.Number)
 	if pr.Merged {
@@ -77,6 +78,7 @@ func (pr pullrequest) ToModel(customerID string, repoName string, repoID string)
 			Offset:  md.Offset,
 		}
 		pullrequest.MergedByRefID = pr.MergedBy.RefID(customerID)
+		userManager.emitAuthor(pr.MergedBy)
 	}
 	cd, _ := datetime.NewDateWithTime(pr.CreatedAt)
 	pullrequest.CreatedDate = sourcecode.PullRequestCreatedDate{
@@ -100,6 +102,7 @@ func (pr pullrequest) ToModel(customerID string, repoName string, repoID string)
 	case "CLOSED":
 		pullrequest.Status = sourcecode.PullRequestStatusClosed
 		pullrequest.ClosedByRefID = "" // TODO
+		// userManager.emit(pr.Author)
 		pullrequest.ClosedDate = sourcecode.PullRequestClosedDate{
 			Epoch:   ud.Epoch,
 			Rfc3339: ud.Rfc3339,
