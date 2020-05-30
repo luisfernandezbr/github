@@ -9,36 +9,47 @@ import (
 )
 
 type pullrequest struct {
-	ID          string             `json:"id"`
-	Body        string             `json:"bodyHTML"`
-	URL         string             `json:"url"`
-	Closed      bool               `json:"closed"`
-	Draft       bool               `json:"draft"`
-	Locked      bool               `json:"locked"`
-	Merged      bool               `json:"merged"`
-	Number      int                `json:"number"`
-	State       string             `json:"state"`
-	Title       string             `json:"title"`
-	CreatedAt   time.Time          `json:"createdAt"`
-	UpdatedAt   time.Time          `json:"updatedAt"`
-	MergedAt    time.Time          `json:"mergedAt"`
-	Author      author             `json:"author"`
-	Branch      string             `json:"branch"`
-	MergeCommit oidProp            `json:"mergeCommit"`
-	MergedBy    author             `json:"mergedBy"`
-	Commits     pullrequestcommits `json:"commits"`
-	Reviews     reviews            `json:"reviews"`
+	ID          string              `json:"id"`
+	Body        string              `json:"bodyHTML"`
+	URL         string              `json:"url"`
+	Closed      bool                `json:"closed"`
+	Draft       bool                `json:"draft"`
+	Locked      bool                `json:"locked"`
+	Merged      bool                `json:"merged"`
+	Number      int                 `json:"number"`
+	State       string              `json:"state"`
+	Title       string              `json:"title"`
+	CreatedAt   time.Time           `json:"createdAt"`
+	UpdatedAt   time.Time           `json:"updatedAt"`
+	MergedAt    time.Time           `json:"mergedAt"`
+	Author      author              `json:"author"`
+	Branch      string              `json:"branch"`
+	MergeCommit oidProp             `json:"mergeCommit"`
+	MergedBy    author              `json:"mergedBy"`
+	Commits     pullrequestcommits  `json:"commits"`
+	Reviews     pullrequestreviews  `json:"reviews"`
+	Comments    pullrequestcomments `json:"comments"`
 }
 
-func setCommits(pullrequest *sourcecode.PullRequest, commits []*sourcecode.PullRequestCommit) {
+func setPullRequestCommits(pullrequest *sourcecode.PullRequest, commits []*sourcecode.PullRequestCommit) {
 	commitids := []string{}
 	commitshas := []string{}
-	for _, commit := range commits {
+	// commits come from Github in the latest to earliest
+	for i := len(commits) - 1; i >= 0; i-- {
+		commit := commits[i]
 		commitshas = append(commitshas, commit.Sha)
 		commitids = append(commitids, sourcecode.NewCommitID(pullrequest.CustomerID, commit.Sha, refType, pullrequest.RepoID))
 	}
 	pullrequest.CommitShas = commitshas
 	pullrequest.CommitIds = commitids
+	if len(commitids) > 0 {
+		pullrequest.BranchID = sourcecode.NewBranchID(refType, pullrequest.RepoID, pullrequest.CustomerID, pullrequest.BranchName, pullrequest.CommitIds[0])
+	} else {
+		pullrequest.BranchID = sourcecode.NewBranchID(refType, pullrequest.RepoID, pullrequest.CustomerID, pullrequest.BranchName, "")
+	}
+	for _, commit := range commits {
+		commit.BranchID = pullrequest.BranchID
+	}
 }
 
 func (pr pullrequest) ToModel(customerID string, repoName string, repoID string) *sourcecode.PullRequest {
@@ -53,44 +64,19 @@ func (pr pullrequest) ToModel(customerID string, repoName string, repoID string)
 	pullrequest.URL = pr.URL
 	pullrequest.Description = pr.Body
 	pullrequest.Draft = pr.Draft
-	commitids := []string{}
-	commitshas := []string{}
-	pullrequest.CreatedByRefID = pr.Author.RefID()
-	for _, node := range pr.Commits.Nodes {
-		commitshas = append(commitshas, node.Commit.Sha)
-		commitids = append(commitids, sourcecode.NewCommitID(customerID, node.Commit.Sha, refType, repoID))
-	}
-	pullrequest.CommitShas = commitshas
-	pullrequest.CommitIds = commitids
-	if len(commitids) > 0 {
-		pullrequest.BranchID = sourcecode.NewBranchID(refType, repoID, customerID, pr.Branch, commitids[0])
-	} else {
-		pullrequest.BranchID = sourcecode.NewBranchID(refType, repoID, customerID, pr.Branch, "")
-	}
+	pullrequest.CreatedByRefID = pr.Author.RefID(customerID)
 	pullrequest.BranchName = pr.Branch
 	pullrequest.Identifier = fmt.Sprintf("%s#%d", repoName, pr.Number)
 	if pr.Merged {
 		pullrequest.MergeSha = pr.MergeCommit.Oid
+		pullrequest.MergeCommitID = sourcecode.NewCommitID(customerID, pr.MergeCommit.Oid, refType, repoID)
 		md, _ := datetime.NewDateWithTime(pr.MergedAt)
 		pullrequest.MergedDate = sourcecode.PullRequestMergedDate{
 			Epoch:   md.Epoch,
 			Rfc3339: md.Rfc3339,
 			Offset:  md.Offset,
 		}
-		pullrequest.MergedByRefID = pr.MergedBy.RefID()
-	}
-	if pr.Locked {
-		pullrequest.Status = sourcecode.PullRequestStatusLocked
-	} else {
-		switch pr.State {
-		case "OPEN":
-			pullrequest.Status = sourcecode.PullRequestStatusOpen
-		case "CLOSED":
-			pullrequest.Status = sourcecode.PullRequestStatusClosed
-			pullrequest.ClosedByRefID = "" // TODO
-		case "MERGED":
-			pullrequest.Status = sourcecode.PullRequestStatusMerged
-		}
+		pullrequest.MergedByRefID = pr.MergedBy.RefID(customerID)
 	}
 	cd, _ := datetime.NewDateWithTime(pr.CreatedAt)
 	pullrequest.CreatedDate = sourcecode.PullRequestCreatedDate{
@@ -103,6 +89,24 @@ func (pr pullrequest) ToModel(customerID string, repoName string, repoID string)
 		Epoch:   ud.Epoch,
 		Rfc3339: ud.Rfc3339,
 		Offset:  ud.Offset,
+	}
+	switch pr.State {
+	case "OPEN":
+		if pr.Locked {
+			pullrequest.Status = sourcecode.PullRequestStatusLocked
+		} else {
+			pullrequest.Status = sourcecode.PullRequestStatusOpen
+		}
+	case "CLOSED":
+		pullrequest.Status = sourcecode.PullRequestStatusClosed
+		pullrequest.ClosedByRefID = "" // TODO
+		pullrequest.ClosedDate = sourcecode.PullRequestClosedDate{
+			Epoch:   ud.Epoch,
+			Rfc3339: ud.Rfc3339,
+			Offset:  ud.Offset,
+		}
+	case "MERGED":
+		pullrequest.Status = sourcecode.PullRequestStatusMerged
 	}
 	return pullrequest
 }

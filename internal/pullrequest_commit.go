@@ -18,10 +18,11 @@ type pullrequestCommit struct {
 	Committer gitUser   `json:"committer"`
 }
 
-func (c pullrequestCommit) ToModel(customerID string, repoID string, branchID string) *sourcecode.PullRequestCommit {
+func (c pullrequestCommit) ToModel(customerID string, repoID string, prID string) *sourcecode.PullRequestCommit {
 	commit := &sourcecode.PullRequestCommit{}
 	commit.CustomerID = customerID
 	commit.RepoID = repoID
+	commit.PullRequestID = prID
 	commit.ID = sourcecode.NewCommitID(customerID, c.Sha, refType, repoID)
 	commit.Sha = c.Sha
 	commit.Message = c.Message
@@ -30,9 +31,8 @@ func (c pullrequestCommit) ToModel(customerID string, repoID string, branchID st
 	commit.RefType = refType
 	commit.RefID = c.Sha
 	commit.URL = c.URL
-	commit.BranchID = branchID
-	commit.AuthorRefID = c.Author.RefID()
-	commit.CommitterRefID = c.Committer.RefID()
+	commit.AuthorRefID = c.Author.RefID(customerID)
+	commit.CommitterRefID = c.Committer.RefID(customerID)
 	dt, _ := datetime.NewDateWithTime(c.Date)
 	commit.CreatedDate = sourcecode.PullRequestCommitCreatedDate{
 		Epoch:   dt.Epoch,

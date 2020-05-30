@@ -1,24 +1,30 @@
 package internal
 
+import "github.com/pinpt/go-common/hash"
+
 type author struct {
-	ID     string  `json:"id"`
-	Email  string  `json:"email"`
-	Name   string  `json:"name"`
-	Avatar string  `json:"avatarUrl"`
-	Login  string  `json:"login"`
-	BotURL *string `json:"boturl"`
+	ID     string `json:"id"`
+	Email  string `json:"email"`
+	Name   string `json:"name"`
+	Avatar string `json:"avatarUrl"`
+	Login  string `json:"login"`
+	URL    string `json:"url"`
+	Type   string `json:"type"`
 }
 
-func (a author) RefID() string {
-	// FIXME: this doesn't seem right but tried to following current agent
-	// https://github.com/pinpt/agent/blob/afcc3e5b585a1902eeeaec89e37424f651818e6f/integrations/github/user.go#L199
-	if a.Name == "GitHub" && a.Email == "noreply@github.com" {
-		return "github-noreply"
-	}
-	if a.Login == "" {
+func (a author) RefID(customerID string) string {
+	// FIXME: review how we do this in current agent to match
+	switch a.Type {
+	case "Bot":
 		return ""
+	case "User":
+		return a.ID
+	case "Mannequin":
 	}
-	return a.Login
+	if a.Email != "" {
+		return hash.Values(customerID, a.Email)
+	}
+	return "" // FIXME
 }
 
 type gitUser struct {
@@ -28,7 +34,13 @@ type gitUser struct {
 	User   author `json:"user"`
 }
 
-func (a gitUser) RefID() string {
+func (a gitUser) RefID(customerID string) string {
 	// FIXME
+	if a.User.ID != "" {
+		return a.User.ID
+	}
+	if a.Email != "" {
+		return hash.Values(customerID, a.Email)
+	}
 	return a.User.Login
 }

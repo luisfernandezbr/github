@@ -68,27 +68,25 @@ query GetPullRequests($name: String!, $owner: String!, $first: Int!, $after: Str
 					oid
 				}
 				mergedBy {
+					type: __typename
 					avatarUrl
+					login
+					url
 					...on User {
 						id
-						login
 						email
 						name
-					}
-					...on Bot {
-						boturl: url
 					}
 				}
 				author {
+					type: __typename
 					avatarUrl
+					login
+					url
 					...on User {
 						id
-						login
 						email
 						name
-					}
-					...on Bot {
-						boturl: url
 					}
 				}
 				commits(first: 10) {
@@ -133,15 +131,34 @@ query GetPullRequests($name: String!, $owner: String!, $first: Int!, $after: Str
 						createdAt
 						url
 						author {
+							type: __typename
 							avatarUrl
+							login
+							url
 							...on User {
 								id
-								login
 								email
 								name
 							}
-							...on Bot {
-								boturl: url
+						}
+					}
+				}
+				comments(first: 10) {
+					nodes {
+						id
+						createdAt
+						updatedAt
+						url
+						bodyHTML
+						author {
+							type: __typename
+							avatarUrl
+							login
+							url
+							...on User {
+								id
+								email
+								name
 							}
 						}
 					}
@@ -291,27 +308,25 @@ query GetAllData($login: String!, $first: Int!, $after: String) {
 							oid
 						}
 						mergedBy {
+							type: __typename
 							avatarUrl
+							login
+							url
 							...on User {
 								id
-								login
 								email
 								name
-							}
-							...on Bot {
-								boturl: url
 							}
 						}
 						author {
+							type: __typename
 							avatarUrl
+							login
+							url
 							...on User {
 								id
-								login
 								email
 								name
-							}
-							...on Bot {
-								boturl: url
 							}
 						}
 						commits(first: 10) {
@@ -350,21 +365,50 @@ query GetAllData($login: String!, $first: Int!, $after: String) {
 							}
 						}
 						reviews(first: 10) {
+							totalCount
+							pageInfo {
+								hasNextPage
+								endCursor
+							}
 							nodes {
 								id
 								state
 								createdAt
 								url
 								author {
+									type: __typename
 									avatarUrl
+									login
+									url
 									...on User {
 										id
-										login
 										email
 										name
 									}
-									...on Bot {
-										boturl: url
+								}
+							}
+						}
+						comments(first: 10) {
+							totalCount
+							pageInfo {
+								hasNextPage
+								endCursor
+							}
+							nodes {
+								id
+								createdAt
+								updatedAt
+								url
+								bodyHTML
+								author {
+									type: __typename
+									avatarUrl
+									login
+									url
+									...on User {
+										id
+										email
+										name
 									}
 								}
 							}

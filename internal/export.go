@@ -21,7 +21,7 @@ const (
 type job func(export sdk.Export, pipe sdk.Pipe) error
 
 func (g *GithubIntegration) checkForRetryableError(export sdk.Export, err error) bool {
-	if strings.Contains(err.Error(), "Something went wrong while executing your query") {
+	if strings.Contains(err.Error(), "Something went wrong while executing your query") || strings.Contains(err.Error(), "EOF") {
 		log.Info(g.logger, "retryable error detected, will pause for about one minute", "err", err)
 		export.Paused(time.Now().Add(time.Minute))
 		time.Sleep(time.Minute + time.Millisecond*time.Duration(rand.Int63n(500)))
@@ -73,13 +73,14 @@ func (g *GithubIntegration) checkForRateLimit(export sdk.Export, rateLimit rateL
 	return nil
 }
 
-func (g *GithubIntegration) fetchPullRequestCommits(export sdk.Export, name string, pullRequestID string, repoID string, branchID string, cursor string) ([]*sourcecode.PullRequestCommit, error) {
+func (g *GithubIntegration) fetchPullRequestCommits(export sdk.Export, name string, pullRequestID string, repoID string, cursor string) ([]*sourcecode.PullRequestCommit, error) {
 	log.Info(g.logger, "need to run a pull request paginated commits starting from "+cursor, "repo", name, "pullrequest_id", pullRequestID)
 	var variables = map[string]interface{}{
 		"first": defaultPullRequestCommitPageSize,
 		"after": cursor,
 		"id":    pullRequestID,
 	}
+	customerID := export.CustomerID()
 	var retryCount int
 	commits := make([]*sourcecode.PullRequestCommit, 0)
 	for {
@@ -104,7 +105,7 @@ func (g *GithubIntegration) fetchPullRequestCommits(export sdk.Export, name stri
 		g.lock.Unlock()
 		retryCount = 0
 		for _, node := range result.Node.Commits.Nodes {
-			prcommit := node.Commit.ToModel(export.CustomerID(), repoID, branchID)
+			prcommit := node.Commit.ToModel(customerID, repoID, pullRequestID)
 			commits = append(commits, prcommit)
 		}
 		if err := g.checkForRateLimit(export, result.RateLimit); err != nil {
@@ -127,6 +128,7 @@ func (g *GithubIntegration) queuePullRequestJob(repoOwner string, repoName strin
 			"owner": repoOwner,
 			"name":  repoName,
 		}
+		customerID := export.CustomerID()
 		fullname := repoOwner + "/" + repoName
 		var retryCount int
 		for {
@@ -151,9 +153,9 @@ func (g *GithubIntegration) queuePullRequestJob(repoOwner string, repoName strin
 			g.lock.Unlock()
 			retryCount = 0
 			for _, prnode := range result.Repository.Pullrequests.Nodes {
-				pullrequest := prnode.ToModel(export.CustomerID(), fullname, repoID)
+				pullrequest := prnode.ToModel(customerID, fullname, repoID)
 				for _, reviewnode := range prnode.Reviews.Nodes {
-					prreview := reviewnode.ToModel(export.CustomerID(), repoID, pullrequest.GetID())
+					prreview := reviewnode.ToModel(customerID, repoID, pullrequest.ID)
 					if err := pipe.Write(prreview); err != nil {
 						return err
 					}
@@ -163,19 +165,19 @@ func (g *GithubIntegration) queuePullRequestJob(repoOwner string, repoName strin
 				}
 				commits := make([]*sourcecode.PullRequestCommit, 0)
 				for _, commitnode := range prnode.Commits.Nodes {
-					prcommit := commitnode.Commit.ToModel(export.CustomerID(), repoID, pullrequest.BranchID)
+					prcommit := commitnode.Commit.ToModel(customerID, repoID, pullrequest.ID)
 					commits = append(commits, prcommit)
 				}
 				if prnode.Commits.PageInfo.HasNextPage {
 					// fetch all the remaining paged commits
-					morecommits, err := g.fetchPullRequestCommits(export, fullname, prnode.ID, pullrequest.RepoID, pullrequest.BranchID, prnode.Commits.PageInfo.EndCursor)
+					morecommits, err := g.fetchPullRequestCommits(export, fullname, prnode.ID, pullrequest.RepoID, prnode.Commits.PageInfo.EndCursor)
 					if err != nil {
 						return err
 					}
 					commits = append(commits, morecommits...)
 				}
 				// set the commits back on the pull request
-				setCommits(pullrequest, commits)
+				setPullRequestCommits(pullrequest, commits)
 				// stream out all our commits
 				for _, commit := range commits {
 					if err := pipe.Write(commit); err != nil {
@@ -221,9 +223,10 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 	var variables = map[string]interface{}{
 		"first": 10,
 	}
+	customerID := export.CustomerID()
 	jobs := make([]job, 0)
 	started := time.Now()
-	var repoCount, prCount, reviewCount, commitCount int
+	var repoCount, prCount, reviewCount, commitCount, commentCount int
 	for _, orgnode := range allorgs.Viewer.Organizations.Nodes {
 		if !orgnode.IsMember {
 			continue
@@ -250,15 +253,19 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 			}
 			retryCount = 0
 			for _, node := range result.Organization.Repositories.Nodes {
+				if node.IsArchived {
+					// skip archived for now
+					continue
+				}
 				repoCount++
-				repo := node.ToModel(export.CustomerID())
+				repo := node.ToModel(customerID)
 				if err := pipe.Write(repo); err != nil {
 					return err
 				}
 				for _, prnode := range node.Pullrequests.Nodes {
-					pullrequest := prnode.ToModel(export.CustomerID(), node.Name, repo.GetID())
+					pullrequest := prnode.ToModel(customerID, node.Name, repo.ID)
 					for _, reviewnode := range prnode.Reviews.Nodes {
-						prreview := reviewnode.ToModel(export.CustomerID(), repo.GetID(), pullrequest.GetID())
+						prreview := reviewnode.ToModel(customerID, repo.ID, pullrequest.ID)
 						if err := pipe.Write(prreview); err != nil {
 							return err
 						}
@@ -267,14 +274,24 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 					if prnode.Reviews.PageInfo.HasNextPage {
 						// TODO: queue
 					}
+					for _, commentnode := range prnode.Comments.Nodes {
+						prcomment := commentnode.ToModel(customerID, repo.ID, pullrequest.ID)
+						if err := pipe.Write(prcomment); err != nil {
+							return err
+						}
+						commentCount++
+					}
+					if prnode.Comments.PageInfo.HasNextPage {
+						// TODO: queue
+					}
 					commits := make([]*sourcecode.PullRequestCommit, 0)
 					for _, commitnode := range prnode.Commits.Nodes {
-						prcommit := commitnode.Commit.ToModel(export.CustomerID(), repo.ID, pullrequest.BranchID)
+						prcommit := commitnode.Commit.ToModel(customerID, repo.ID, pullrequest.ID)
 						commits = append(commits, prcommit)
 					}
 					if prnode.Commits.PageInfo.HasNextPage {
 						// fetch all the remaining paged commits
-						morecommits, err := g.fetchPullRequestCommits(export, repo.Name, prnode.ID, pullrequest.RepoID, pullrequest.BranchID, prnode.Commits.PageInfo.EndCursor)
+						morecommits, err := g.fetchPullRequestCommits(export, repo.Name, prnode.ID, pullrequest.RepoID, prnode.Commits.PageInfo.EndCursor)
 						if err != nil {
 							return err
 						}
@@ -282,7 +299,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 						log.Debug(g.logger, "fetched pull request commits", "count", len(commits), "pullrequest_id", prnode.ID, "repo", repo.Name)
 					}
 					// set the commits back on the pull request
-					setCommits(pullrequest, commits)
+					setPullRequestCommits(pullrequest, commits)
 					// stream out all our commits
 					for _, commit := range commits {
 						if err := pipe.Write(commit); err != nil {
@@ -315,44 +332,51 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 			page++
 		}
 	}
-	log.Info(g.logger, "initial export completed", "duration", time.Since(started), "repoCount", repoCount, "prCount", prCount, "reviewCount", reviewCount, "commitCount", commitCount)
+	log.Info(g.logger, "initial export completed", "duration", time.Since(started), "repoCount", repoCount, "prCount", prCount, "reviewCount", reviewCount, "commitCount", commitCount, "commentCount", commentCount)
 
-	// now cycle through any pending jobs after the first pass
-	var wg sync.WaitGroup
-	var maxSize = 2
-	jobch := make(chan job, maxSize*5)
-	errors := make(chan error, maxSize)
-	// run our jobs in parallel but we're going to run the graphql request in single threaded mode to try
-	// and reduce abuse from GitHub but at least the processing can be done parallel on our side
-	for i := 0; i < maxSize; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for job := range jobch {
-				if err := job(export, pipe); err != nil {
-					log.Error(g.logger, "error running job", "err", err)
-					errors <- err
-					return
+	var skipHistorical bool
+	if g.config["skip-historical"] == "true" {
+		skipHistorical = true
+	}
+
+	if !skipHistorical {
+		// now cycle through any pending jobs after the first pass
+		var wg sync.WaitGroup
+		var maxSize = 2
+		jobch := make(chan job, maxSize*5)
+		errors := make(chan error, maxSize)
+		// run our jobs in parallel but we're going to run the graphql request in single threaded mode to try
+		// and reduce abuse from GitHub but at least the processing can be done parallel on our side
+		for i := 0; i < maxSize; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for job := range jobch {
+					if err := job(export, pipe); err != nil {
+						log.Error(g.logger, "error running job", "err", err)
+						errors <- err
+						return
+					}
+					// docs say a min of one second between requests
+					// https://developer.github.com/v3/guides/best-practices-for-integrators/#dealing-with-abuse-rate-limits
+					time.Sleep(time.Second)
 				}
-				// docs say a min of one second between requests
-				// https://developer.github.com/v3/guides/best-practices-for-integrators/#dealing-with-abuse-rate-limits
-				time.Sleep(time.Second)
-			}
-		}()
-	}
-	for _, job := range jobs {
-		jobch <- job
-	}
-	// close and wait for all our jobs to complete
-	close(jobch)
-	wg.Wait()
-	// check to see if we had an early exit
-	select {
-	case err := <-errors:
-		pipe.Close()
-		export.Completed(err)
-		return nil
-	default:
+			}()
+		}
+		for _, job := range jobs {
+			jobch <- job
+		}
+		// close and wait for all our jobs to complete
+		close(jobch)
+		wg.Wait()
+		// check to see if we had an early exit
+		select {
+		case err := <-errors:
+			pipe.Close()
+			export.Completed(err)
+			return nil
+		default:
+		}
 	}
 
 	// finish it up

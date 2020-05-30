@@ -7,13 +7,13 @@ import (
 	"github.com/pinpt/integration-sdk/sourcecode"
 )
 
-type reviews struct {
+type pullrequestreviews struct {
 	TotalCount int
 	PageInfo   pageInfo
-	Nodes      []review
+	Nodes      []pullrequestreview
 }
 
-type review struct {
+type pullrequestreview struct {
 	ID        string    `json:"id"`
 	State     string    `json:"state"`
 	CreatedAt time.Time `json:"createdAt"`
@@ -21,7 +21,7 @@ type review struct {
 	URL       string    `json:"url"`
 }
 
-func (r review) ToModel(customerID string, repoID string, prID string) *sourcecode.PullRequestReview {
+func (r pullrequestreview) ToModel(customerID string, repoID string, prID string) *sourcecode.PullRequestReview {
 	prreview := &sourcecode.PullRequestReview{}
 	prreview.CustomerID = customerID
 	prreview.ID = sourcecode.NewPullRequestReviewID(customerID, r.ID, refType, repoID)
@@ -48,5 +48,6 @@ func (r review) ToModel(customerID string, repoID string, prID string) *sourceco
 	case "DISMISSED":
 		prreview.State = sourcecode.PullRequestReviewStateDismissed
 	}
+	prreview.UserRefID = r.Author.RefID(customerID)
 	return prreview
 }

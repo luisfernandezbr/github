@@ -1,7 +1,7 @@
 # GitHub Notes
 
 - Current timing on my laptop
-    - initial export completed duration=45.010112956s commitCount=768 prCount=768 repoCount=184 reviewCount=81
+    - initial export completed duration=1m4.639243131s commentCount=110 commitCount=1606 prCount=535 repoCount=120 reviewCount=605
     - ~4m to export all the remaining prs and pr reviews
 - Need to verify user ref_ids
 - Enterprise on-premise vs. cloud
