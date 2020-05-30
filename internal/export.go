@@ -85,6 +85,15 @@ func (g *GithubIntegration) queuePullRequestJob(repoOwner string, repoName strin
 				if prnode.Reviews.PageInfo.HasNextPage {
 					// TODO: queue
 				}
+				for _, commitnode := range prnode.Commits.Nodes {
+					prcommit := commitnode.Commit.ToModel(export.CustomerID(), repoID, pullrequest.BranchID)
+					if err := pipe.Write(prcommit); err != nil {
+						return err
+					}
+				}
+				if prnode.Commits.PageInfo.HasNextPage {
+					// TODO: queue
+				}
 			}
 			if !result.Repository.Pullrequests.PageInfo.HasNextPage {
 				break
