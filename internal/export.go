@@ -345,6 +345,10 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 	}
 
 	if !skipHistorical {
+
+		// flush any pending data to get it to send immediately
+		pipe.Flush()
+
 		// now cycle through any pending jobs after the first pass
 		var wg sync.WaitGroup
 		var maxSize = 2
