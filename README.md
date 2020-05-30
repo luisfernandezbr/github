@@ -16,7 +16,7 @@ This is a working concept prototype for the next generation of the Agent's GitHu
 You can run like this:
 
 ```
-agent.next dev . --log-level=debug --config apikey=$PP_GITHUB_TOKEN --config organization=pinpt
+agent.next dev . --log-level=debug --config apikey=$PP_GITHUB_TOKEN
 ```
 
 This will run an export for GitHub and print all the JSON objects to the console.
