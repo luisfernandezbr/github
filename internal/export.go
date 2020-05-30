@@ -106,62 +106,78 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 	if err != nil {
 		return err
 	}
-	org := g.config["organization"]
-	var variables = map[string]interface{}{
-		"login": org,
-		"first": 10,
-	}
-	jobs := make([]job, 0)
-	started := time.Now()
-	var repoCount, prCount, reviewCount int
+	// first we're going to fetch all the organizations that the viewer is a member of
+	var allorgs allOrgsResult
 	for {
-		var result allQueryResult
-		if err := g.client.Query(allDataQuery, variables, &result); err != nil {
+		if err := g.client.Query(allOrgsQuery, map[string]interface{}{"first": 100}, &allorgs); err != nil {
 			if g.checkForAbuseDetection(export, err) {
 				continue
 			}
 			export.Completed(err)
 			return nil
 		}
-		for _, node := range result.Organization.Repositories.Nodes {
-			repoCount++
-			repo := node.ToModel(export.CustomerID())
-			if err := pipe.Write(repo); err != nil {
-				return err
+		break
+	}
+	var variables = map[string]interface{}{
+		"first": 10,
+	}
+	jobs := make([]job, 0)
+	started := time.Now()
+	var repoCount, prCount, reviewCount int
+	for _, orgnode := range allorgs.Viewer.Organizations.Nodes {
+		if !orgnode.IsMember {
+			continue
+		}
+		variables["login"] = orgnode.Login
+		for {
+			var result allQueryResult
+			if err := g.client.Query(allDataQuery, variables, &result); err != nil {
+				if g.checkForAbuseDetection(export, err) {
+					continue
+				}
+				export.Completed(err)
+				return nil
 			}
-			for _, prnode := range node.Pullrequests.Nodes {
-				pullrequest := prnode.ToModel(export.CustomerID(), node.Name, repo.GetID())
-				if err := pipe.Write(pullrequest); err != nil {
+			for _, node := range result.Organization.Repositories.Nodes {
+				repoCount++
+				repo := node.ToModel(export.CustomerID())
+				if err := pipe.Write(repo); err != nil {
 					return err
 				}
-				prCount++
-				for _, reviewnode := range prnode.Reviews.Nodes {
-					prreview := reviewnode.ToModel(export.CustomerID(), repo.GetID(), pullrequest.GetID())
-					if err := pipe.Write(prreview); err != nil {
+				for _, prnode := range node.Pullrequests.Nodes {
+					pullrequest := prnode.ToModel(export.CustomerID(), node.Name, repo.GetID())
+					if err := pipe.Write(pullrequest); err != nil {
 						return err
 					}
-					reviewCount++
+					prCount++
+					for _, reviewnode := range prnode.Reviews.Nodes {
+						prreview := reviewnode.ToModel(export.CustomerID(), repo.GetID(), pullrequest.GetID())
+						if err := pipe.Write(prreview); err != nil {
+							return err
+						}
+						reviewCount++
+					}
+					if prnode.Reviews.PageInfo.HasNextPage {
+						// TODO: queue
+					}
 				}
-				if prnode.Reviews.PageInfo.HasNextPage {
-					// TODO: queue
+				if node.Pullrequests.PageInfo.HasNextPage {
+					tok := strings.Split(node.Name, "/")
+					// queue the pull requests for the next page
+					jobs = append(jobs, g.queuePullRequestJob(tok[0], tok[1], repo.GetID(), node.Pullrequests.PageInfo.EndCursor))
 				}
 			}
-			if node.Pullrequests.PageInfo.HasNextPage {
-				tok := strings.Split(node.Name, "/")
-				// queue the pull requests for the next page
-				jobs = append(jobs, g.queuePullRequestJob(tok[0], tok[1], repo.GetID(), node.Pullrequests.PageInfo.EndCursor))
+			// check to see if we are at the end of our pagination
+			if !result.Organization.Repositories.PageInfo.HasNextPage {
+				break
 			}
+			if err := g.checkForRateLimit(export, result.RateLimit); err != nil {
+				pipe.Close()
+				export.Completed(err)
+				return nil
+			}
+			variables["after"] = result.Organization.Repositories.PageInfo.EndCursor
 		}
-		// check to see if we are at the end of our pagination
-		if !result.Organization.Repositories.PageInfo.HasNextPage {
-			break
-		}
-		if err := g.checkForRateLimit(export, result.RateLimit); err != nil {
-			pipe.Close()
-			export.Completed(err)
-			return nil
-		}
-		variables["after"] = result.Organization.Repositories.PageInfo.EndCursor
 	}
 	log.Info(g.logger, "initial export completed", "duration", time.Since(started), "repoCount", repoCount, "prCount", prCount, "reviewCount", reviewCount)
 
