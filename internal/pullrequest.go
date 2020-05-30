@@ -30,6 +30,17 @@ type pullrequest struct {
 	Reviews     reviews            `json:"reviews"`
 }
 
+func setCommits(pullrequest *sourcecode.PullRequest, commits []*sourcecode.PullRequestCommit) {
+	commitids := []string{}
+	commitshas := []string{}
+	for _, commit := range commits {
+		commitshas = append(commitshas, commit.Sha)
+		commitids = append(commitids, sourcecode.NewCommitID(pullrequest.CustomerID, commit.Sha, refType, pullrequest.RepoID))
+	}
+	pullrequest.CommitShas = commitshas
+	pullrequest.CommitIds = commitids
+}
+
 func (pr pullrequest) ToModel(customerID string, repoName string, repoID string) *sourcecode.PullRequest {
 	// FIXME: implement the remaining fields
 	pullrequest := &sourcecode.PullRequest{}
@@ -105,4 +116,23 @@ type pullrequests struct {
 	TotalCount int
 	PageInfo   pageInfo
 	Nodes      []pullrequest
+}
+
+type pullrequestPagedCommit struct {
+	Commit pullrequestCommit `json:"commit"`
+}
+
+type pullrequestPagedCommitNode struct {
+	Nodes []pullrequestPagedCommit `json:"nodes"`
+}
+
+type pullrequestPagedCommits struct {
+	TotalCount int
+	PageInfo   pageInfo
+	Commits    pullrequestPagedCommitNode `json:"commits"`
+}
+
+type pullrequestPagedCommitsResult struct {
+	RateLimit rateLimit               `json:"rateLimit"`
+	Node      pullrequestPagedCommits `json:"node"`
 }

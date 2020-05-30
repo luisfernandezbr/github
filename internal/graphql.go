@@ -40,7 +40,7 @@ type allQueryResult struct {
 	RateLimit    rateLimit    `json:"rateLimit"`
 }
 
-var pullrequestPageQuery = `
+var pullrequestPagedQuery = `
 query GetPullRequests($name: String!, $owner: String!, $first: Int!, $after: String) {
 	repository(name: $name, owner: $owner) {
 		pullRequests(first: $first, after: $after, orderBy: {field: UPDATED_AT, direction: DESC}) {
@@ -178,6 +178,56 @@ type organizations struct {
 	Nodes []org `json:"nodes"`
 }
 
+var allPRCommitsQuery = `
+query GetAllPRCommits($id: ID!, $first: Int!, $after: String) {
+	node(id: $id) {
+		...on PullRequest {
+			commits(first: $first after: $after) {
+				totalCount
+				pageInfo {
+					hasNextPage
+					endCursor
+				}
+				nodes {
+					commit {
+						sha: oid
+						message
+						authoredDate
+						additions
+						deletions
+						url
+						author {
+							avatarUrl
+							email
+							name
+							user {
+								id
+								login
+							}
+						}
+						committer {
+							avatarUrl
+							email
+							name
+							user {
+								id
+								login
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	rateLimit {
+		limit
+		cost
+		remaining
+		resetAt
+	}
+}
+`
+
 var allOrgsQuery = `
 query GetAllOrgs($first: Int!, $after: String) {
 	viewer {
@@ -264,7 +314,7 @@ query GetAllData($login: String!, $first: Int!, $after: String) {
 								boturl: url
 							}
 						}
-						commits(first: 1) {
+						commits(first: 10) {
 							totalCount
 							pageInfo {
 								hasNextPage
