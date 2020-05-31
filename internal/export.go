@@ -208,6 +208,20 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 	if err != nil {
 		return err
 	}
+	config := export.Config()
+	url := config["url"]
+	if url == "" {
+		url = "https://api.github.com/graphql"
+	}
+	apikey := config["api_key"]
+	if apikey == "" {
+		return fmt.Errorf("required api_key not found")
+	}
+	g.client = g.manager.GraphQLManager().New(url, map[string]string{
+		"Authorization": "bearer " + apikey,
+	})
+	log.Debug(g.logger, "export starting", "url", url)
+
 	// first we're going to fetch all the organizations that the viewer is a member of
 	var allorgs allOrgsResult
 	var orgs []string

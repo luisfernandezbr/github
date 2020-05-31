@@ -117,6 +117,8 @@ github.com/pinpt/agent.next v0.0.0-20200530062035-4326c1aa138c h1:h1mBjw7VjOmkOA
 github.com/pinpt/agent.next v0.0.0-20200530062035-4326c1aa138c/go.mod h1:9DZ2KQycdKANzI3L0E+5h2jzaJR0WZnbM+CP1Uj4nsU=
 github.com/pinpt/go-common v9.1.76+incompatible h1:OKkEl5Js8oK8zsO2LRkmGNhcJ78W8XdZZG1q7Fniq9Y=
 github.com/pinpt/go-common v9.1.76+incompatible/go.mod h1:UNav2OONS53sU+qptYdsY8gAECXEfHEqH8p/3dJ11MM=
+github.com/pinpt/go-common v9.1.77+incompatible h1:ABdhZ5gmgiiSm9XUwFi/ZGRujHnlQ77F+0Hiv0pthmI=
+github.com/pinpt/go-common v9.1.77+incompatible/go.mod h1:UNav2OONS53sU+qptYdsY8gAECXEfHEqH8p/3dJ11MM=
 github.com/pinpt/httpclient v0.0.0-20190815022759-09e0028c9067/go.mod h1:SzzGa0kOT+frqT6ABgV69U9+jlMU98XkmKup+HEZRVI=
 github.com/pinpt/integration-sdk v0.0.990 h1:EH30Yd1/HkBAlOa5fvyUqOEvH2WClk/kP9jZc+ThxY4=
 github.com/pinpt/integration-sdk v0.0.990/go.mod h1:qUcq112fPafDOc8D0YvXjeWD/WihN0v3kjR77EDbVVE=
