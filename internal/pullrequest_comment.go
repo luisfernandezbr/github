@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/pinpt/go-common/datetime"
-
 	"github.com/pinpt/integration-sdk/sourcecode"
 )
 

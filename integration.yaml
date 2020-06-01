@@ -1,10 +1,10 @@
 name: GitHub
-reftype: github
+ref_type: github
 description: This is the official GitHub integration for Pinpoint
 publisher:
   name: Pinpoint
   url: https://pinpoint.com
-  avatar: https://avatars0.githubusercontent.com/u/24400526?s=200&v=4
+  avatar_url: https://avatars0.githubusercontent.com/u/24400526?s=200&v=4
 capabilities:
   - sourcecode.Repo
   - sourcecode.User
@@ -20,7 +20,7 @@ installation:
     cloud:
       network:
         hostnames:
-          - "*.github.com"
+          - "api.github.com"
       capabilities:
         - web.Hook
         - auth.OAuth2
@@ -58,7 +58,7 @@ installation:
           description: Please provide the URL to your Enterprise GitHub server
           type: string
           required: true
-        - name: apikey
+        - name: api_key
           description: Please provide the APIKey to your Enterprise GitHub server
           type: string
           required: true

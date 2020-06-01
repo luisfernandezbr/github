@@ -18,11 +18,6 @@ type GithubIntegration struct {
 
 var _ sdk.Integration = (*GithubIntegration)(nil)
 
-// RefType should return the integration ref_type (the short, unique identifier of the integration)
-func (g *GithubIntegration) RefType() string {
-	return refType
-}
-
 // Start is called when the integration is starting up
 func (g *GithubIntegration) Start(logger log.Logger, config sdk.Config, manager sdk.Manager) error {
 	g.logger = logger
