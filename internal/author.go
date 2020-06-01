@@ -3,9 +3,7 @@ package internal
 import (
 	"strings"
 
-	"github.com/pinpt/go-common/hash"
-	ps "github.com/pinpt/go-common/strings"
-	"github.com/pinpt/integration-sdk/sourcecode"
+	"github.com/pinpt/agent.next/sdk"
 )
 
 func isBot(name string) bool {
@@ -22,32 +20,32 @@ type author struct {
 	Type   string `json:"type"`
 }
 
-func (a author) ToModel(customerID string) *sourcecode.User {
-	user := &sourcecode.User{}
+func (a author) ToModel(customerID string) *sdk.SourceCodeUser {
+	user := &sdk.SourceCodeUser{}
 	user.CustomerID = customerID
 	user.RefID = a.RefID(customerID)
 	user.RefType = refType
-	user.ID = sourcecode.NewUserID(customerID, refType, user.RefID)
-	user.URL = ps.Pointer(a.URL)
-	user.AvatarURL = ps.Pointer(a.Avatar)
-	user.Email = ps.Pointer(a.Email)
+	user.ID = sdk.NewSourceCodeUserID(customerID, refType, user.RefID)
+	user.URL = sdk.StringPointer(a.URL)
+	user.AvatarURL = sdk.StringPointer(a.Avatar)
+	user.Email = sdk.StringPointer(a.Email)
 	if user.Email != nil {
-		id := hash.Values(customerID, a.Email)
+		id := sdk.Hash(customerID, a.Email)
 		if id != user.RefID {
-			user.AssociatedRefID = ps.Pointer(id)
+			user.AssociatedRefID = sdk.StringPointer(id)
 		}
 	}
 	user.Name = a.Name
 	switch a.Type {
 	case "Bot":
-		user.Type = sourcecode.UserTypeBot
+		user.Type = sdk.SourceCodeUserTypeBot
 	case "User":
-		user.Type = sourcecode.UserTypeHuman
-		user.Username = ps.Pointer(a.Login)
+		user.Type = sdk.SourceCodeUserTypeHuman
+		user.Username = sdk.StringPointer(a.Login)
 	case "Mannequin":
 	}
 	if user.RefID == "" || isBot(a.Name) {
-		user.Type = sourcecode.UserTypeBot
+		user.Type = sdk.SourceCodeUserTypeBot
 	}
 	return user
 }
@@ -62,7 +60,7 @@ func (a author) RefID(customerID string) string {
 	case "Mannequin":
 	}
 	if a.Email != "" {
-		return hash.Values(customerID, a.Email)
+		return sdk.Hash(customerID, a.Email)
 	}
 	return "" // FIXME
 }
@@ -80,36 +78,36 @@ func (a gitUser) RefID(customerID string) string {
 		return a.User.ID
 	}
 	if a.Email != "" {
-		return hash.Values(customerID, a.Email)
+		return sdk.Hash(customerID, a.Email)
 	}
 	return ""
 }
 
-func (a gitUser) ToModel(customerID string) *sourcecode.User {
-	user := &sourcecode.User{}
+func (a gitUser) ToModel(customerID string) *sdk.SourceCodeUser {
+	user := &sdk.SourceCodeUser{}
 	user.CustomerID = customerID
 	user.RefID = a.RefID(customerID)
 	user.RefType = refType
 	if a.Email != "" {
-		id := hash.Values(customerID, a.Email)
+		id := sdk.Hash(customerID, a.Email)
 		if id != user.RefID {
-			user.AssociatedRefID = ps.Pointer(id)
+			user.AssociatedRefID = sdk.StringPointer(id)
 		}
 	}
-	user.URL = ps.Pointer(a.User.URL)
-	user.AvatarURL = ps.Pointer(a.Avatar)
-	user.Email = ps.Pointer(a.Email)
+	user.URL = sdk.StringPointer(a.User.URL)
+	user.AvatarURL = sdk.StringPointer(a.Avatar)
+	user.Email = sdk.StringPointer(a.Email)
 	user.Name = a.Name
 	switch a.User.Type {
 	case "Bot":
-		user.Type = sourcecode.UserTypeBot
+		user.Type = sdk.SourceCodeUserTypeBot
 	case "User":
-		user.Type = sourcecode.UserTypeHuman
-		user.Username = ps.Pointer(a.User.Login)
+		user.Type = sdk.SourceCodeUserTypeHuman
+		user.Username = sdk.StringPointer(a.User.Login)
 	case "Mannequin":
 	}
 	if user.RefID == "" || isBot(a.Name) {
-		user.Type = sourcecode.UserTypeBot
+		user.Type = sdk.SourceCodeUserTypeBot
 	}
 	return user
 }

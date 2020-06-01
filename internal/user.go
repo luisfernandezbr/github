@@ -4,8 +4,6 @@ import (
 	"sync"
 
 	"github.com/pinpt/agent.next/sdk"
-	"github.com/pinpt/go-common/log"
-	"github.com/pinpt/integration-sdk/sourcecode"
 )
 
 var getUserOrgsQuery = `
@@ -77,11 +75,11 @@ func (u *UserManager) emitAuthor(author author) error {
 		return nil
 	}
 	user := author.ToModel(u.customerID)
-	if user.Type == sourcecode.UserTypeHuman {
+	if user.Type == sdk.SourceCodeUserTypeHuman {
 		for {
 			// go to GitHub and find out if this user is a current member of our organization
 			var result userOrgResult
-			log.Debug(u.integration.logger, "need to fetch user org details", "ref_id", refID)
+			sdk.LogDebug(u.integration.logger, "need to fetch user org details", "ref_id", refID)
 			if err := u.integration.client.Query(getUserOrgsQuery, map[string]interface{}{"id": author.ID}, &result); err != nil {
 				u.mu.Unlock()
 				if u.integration.checkForAbuseDetection(u.export, err) {
@@ -90,7 +88,7 @@ func (u *UserManager) emitAuthor(author author) error {
 				if u.integration.checkForRetryableError(u.export, err) {
 					continue
 				}
-				log.Error(u.integration.logger, "error fetching user", "err", err, "ref_id", refID)
+				sdk.LogError(u.integration.logger, "error fetching user", "err", err, "ref_id", refID)
 				return err
 			}
 			var ismember bool
@@ -125,11 +123,11 @@ func (u *UserManager) emitGitUser(author gitUser) error {
 		return nil
 	}
 	user := author.ToModel(u.customerID)
-	if user.Type == sourcecode.UserTypeHuman && author.User.ID != "" {
+	if user.Type == sdk.SourceCodeUserTypeHuman && author.User.ID != "" {
 		for {
 			// go to GitHub and find out if this user is a current member of our organization
 			var result userOrgResult
-			log.Debug(u.integration.logger, "need to fetch user org details", "ref_id", refID)
+			sdk.LogDebug(u.integration.logger, "need to fetch user org details", "ref_id", refID)
 			if err := u.integration.client.Query(getUserOrgsQuery, map[string]interface{}{"id": author.User.ID}, &result); err != nil {
 				u.mu.Unlock()
 				if u.integration.checkForAbuseDetection(u.export, err) {
@@ -140,7 +138,7 @@ func (u *UserManager) emitGitUser(author gitUser) error {
 					u.mu.Lock()
 					continue
 				}
-				log.Error(u.integration.logger, "error fetching user", "err", err, "ref_id", refID)
+				sdk.LogError(u.integration.logger, "error fetching user", "err", err, "ref_id", refID)
 				return err
 			}
 			var ismember bool

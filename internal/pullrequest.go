@@ -4,8 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pinpt/go-common/datetime"
-	"github.com/pinpt/integration-sdk/sourcecode"
+	"github.com/pinpt/agent.next/sdk"
 )
 
 type pullrequest struct {
@@ -31,31 +30,31 @@ type pullrequest struct {
 	Comments    pullrequestcomments `json:"comments"`
 }
 
-func setPullRequestCommits(pullrequest *sourcecode.PullRequest, commits []*sourcecode.PullRequestCommit) {
+func setPullRequestCommits(pullrequest *sdk.SourceCodePullRequest, commits []*sdk.SourceCodePullRequestCommit) {
 	commitids := []string{}
 	commitshas := []string{}
 	// commits come from Github in the latest to earliest
 	for i := len(commits) - 1; i >= 0; i-- {
 		commit := commits[i]
 		commitshas = append(commitshas, commit.Sha)
-		commitids = append(commitids, sourcecode.NewCommitID(pullrequest.CustomerID, commit.Sha, refType, pullrequest.RepoID))
+		commitids = append(commitids, sdk.NewSourceCodeCommitID(pullrequest.CustomerID, commit.Sha, refType, pullrequest.RepoID))
 	}
 	pullrequest.CommitShas = commitshas
 	pullrequest.CommitIds = commitids
 	if len(commitids) > 0 {
-		pullrequest.BranchID = sourcecode.NewBranchID(refType, pullrequest.RepoID, pullrequest.CustomerID, pullrequest.BranchName, pullrequest.CommitIds[0])
+		pullrequest.BranchID = sdk.NewSourceCodeBranchID(refType, pullrequest.RepoID, pullrequest.CustomerID, pullrequest.BranchName, pullrequest.CommitIds[0])
 	} else {
-		pullrequest.BranchID = sourcecode.NewBranchID(refType, pullrequest.RepoID, pullrequest.CustomerID, pullrequest.BranchName, "")
+		pullrequest.BranchID = sdk.NewSourceCodeBranchID(refType, pullrequest.RepoID, pullrequest.CustomerID, pullrequest.BranchName, "")
 	}
 	for _, commit := range commits {
 		commit.BranchID = pullrequest.BranchID
 	}
 }
 
-func (pr pullrequest) ToModel(userManager *UserManager, customerID string, repoName string, repoID string) *sourcecode.PullRequest {
+func (pr pullrequest) ToModel(userManager *UserManager, customerID string, repoName string, repoID string) *sdk.SourceCodePullRequest {
 	// FIXME: implement the remaining fields
-	pullrequest := &sourcecode.PullRequest{}
-	pullrequest.ID = sourcecode.NewPullRequestID(customerID, pr.ID, refType, repoID)
+	pullrequest := &sdk.SourceCodePullRequest{}
+	pullrequest.ID = sdk.NewSourceCodePullRequestID(customerID, pr.ID, refType, repoID)
 	pullrequest.CustomerID = customerID
 	pullrequest.RepoID = repoID
 	pullrequest.RefID = pr.ID
@@ -70,9 +69,9 @@ func (pr pullrequest) ToModel(userManager *UserManager, customerID string, repoN
 	pullrequest.Identifier = fmt.Sprintf("%s#%d", repoName, pr.Number)
 	if pr.Merged {
 		pullrequest.MergeSha = pr.MergeCommit.Oid
-		pullrequest.MergeCommitID = sourcecode.NewCommitID(customerID, pr.MergeCommit.Oid, refType, repoID)
-		md, _ := datetime.NewDateWithTime(pr.MergedAt)
-		pullrequest.MergedDate = sourcecode.PullRequestMergedDate{
+		pullrequest.MergeCommitID = sdk.NewSourceCodeCommitID(customerID, pr.MergeCommit.Oid, refType, repoID)
+		md, _ := sdk.NewDateWithTime(pr.MergedAt)
+		pullrequest.MergedDate = sdk.SourceCodePullRequestMergedDate{
 			Epoch:   md.Epoch,
 			Rfc3339: md.Rfc3339,
 			Offset:  md.Offset,
@@ -80,14 +79,14 @@ func (pr pullrequest) ToModel(userManager *UserManager, customerID string, repoN
 		pullrequest.MergedByRefID = pr.MergedBy.RefID(customerID)
 		userManager.emitAuthor(pr.MergedBy)
 	}
-	cd, _ := datetime.NewDateWithTime(pr.CreatedAt)
-	pullrequest.CreatedDate = sourcecode.PullRequestCreatedDate{
+	cd, _ := sdk.NewDateWithTime(pr.CreatedAt)
+	pullrequest.CreatedDate = sdk.SourceCodePullRequestCreatedDate{
 		Epoch:   cd.Epoch,
 		Rfc3339: cd.Rfc3339,
 		Offset:  cd.Offset,
 	}
-	ud, _ := datetime.NewDateWithTime(pr.UpdatedAt)
-	pullrequest.UpdatedDate = sourcecode.PullRequestUpdatedDate{
+	ud, _ := sdk.NewDateWithTime(pr.UpdatedAt)
+	pullrequest.UpdatedDate = sdk.SourceCodePullRequestUpdatedDate{
 		Epoch:   ud.Epoch,
 		Rfc3339: ud.Rfc3339,
 		Offset:  ud.Offset,
@@ -95,21 +94,21 @@ func (pr pullrequest) ToModel(userManager *UserManager, customerID string, repoN
 	switch pr.State {
 	case "OPEN":
 		if pr.Locked {
-			pullrequest.Status = sourcecode.PullRequestStatusLocked
+			pullrequest.Status = sdk.SourceCodePullRequestStatusLocked
 		} else {
-			pullrequest.Status = sourcecode.PullRequestStatusOpen
+			pullrequest.Status = sdk.SourceCodePullRequestStatusOpen
 		}
 	case "CLOSED":
-		pullrequest.Status = sourcecode.PullRequestStatusClosed
+		pullrequest.Status = sdk.SourceCodePullRequestStatusClosed
 		pullrequest.ClosedByRefID = "" // TODO
 		// userManager.emit(pr.Author)
-		pullrequest.ClosedDate = sourcecode.PullRequestClosedDate{
+		pullrequest.ClosedDate = sdk.SourceCodePullRequestClosedDate{
 			Epoch:   ud.Epoch,
 			Rfc3339: ud.Rfc3339,
 			Offset:  ud.Offset,
 		}
 	case "MERGED":
-		pullrequest.Status = sourcecode.PullRequestStatusMerged
+		pullrequest.Status = sdk.SourceCodePullRequestStatusMerged
 	}
 	return pullrequest
 }

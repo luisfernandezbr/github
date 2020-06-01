@@ -8,8 +8,6 @@ import (
 	"time"
 
 	"github.com/pinpt/agent.next/sdk"
-	"github.com/pinpt/go-common/log"
-	"github.com/pinpt/integration-sdk/sourcecode"
 )
 
 const (
@@ -22,11 +20,11 @@ type job func(export sdk.Export, pipe sdk.Pipe) error
 
 func (g *GithubIntegration) checkForRetryableError(export sdk.Export, err error) bool {
 	if strings.Contains(err.Error(), "Something went wrong while executing your query") || strings.Contains(err.Error(), "EOF") {
-		log.Info(g.logger, "retryable error detected, will pause for about one minute", "err", err)
+		sdk.LogInfo(g.logger, "retryable error detected, will pause for about one minute", "err", err)
 		export.Paused(time.Now().Add(time.Minute))
 		time.Sleep(time.Minute + time.Millisecond*time.Duration(rand.Int63n(500)))
 		export.Resumed()
-		log.Info(g.logger, "retryable error resumed")
+		sdk.LogInfo(g.logger, "retryable error resumed")
 		return true
 	}
 	return false
@@ -35,20 +33,20 @@ func (g *GithubIntegration) checkForRetryableError(export sdk.Export, err error)
 func (g *GithubIntegration) checkForAbuseDetection(export sdk.Export, err error) bool {
 	// first check our retry-after since we get better resolution on how much to slow down
 	if ok, retry := sdk.IsRateLimitError(err); ok {
-		log.Info(g.logger, "rate limit detected", "until", time.Now().Add(retry))
+		sdk.LogInfo(g.logger, "rate limit detected", "until", time.Now().Add(retry))
 		export.Paused(time.Now().Add(retry))
 		time.Sleep(retry)
 		export.Resumed()
-		log.Info(g.logger, "rate limit wake up")
+		sdk.LogInfo(g.logger, "rate limit wake up")
 		return true
 	}
 	if strings.Contains(err.Error(), "You have triggered an abuse detection mechanism") {
 		// we need to try and back off at least 1min + some randomized number of additional ms
-		log.Info(g.logger, "abuse detection, will pause for about one minute")
+		sdk.LogInfo(g.logger, "abuse detection, will pause for about one minute")
 		export.Paused(time.Now().Add(time.Minute))
 		time.Sleep(time.Minute + time.Millisecond*time.Duration(rand.Int63n(500)))
 		export.Resumed()
-		log.Info(g.logger, "abuse detection resumed")
+		sdk.LogInfo(g.logger, "abuse detection resumed")
 		return true
 	}
 	return false
@@ -61,20 +59,20 @@ func (g *GithubIntegration) checkForRateLimit(export sdk.Export, rateLimit rateL
 			return err
 		}
 		// pause until we are no longer rate limited
-		log.Info(g.logger, "rate limited", "until", rateLimit.ResetAt)
+		sdk.LogInfo(g.logger, "rate limited", "until", rateLimit.ResetAt)
 		time.Sleep(time.Until(rateLimit.ResetAt))
-		log.Info(g.logger, "rate limit wake up")
+		sdk.LogInfo(g.logger, "rate limit wake up")
 		// send a resume now that we're no longer rate limited
 		if err := export.Resumed(); err != nil {
 			return err
 		}
 	}
-	log.Debug(g.logger, "rate limit detail", "remaining", rateLimit.Remaining, "cost", rateLimit.Cost, "total", rateLimit.Limit)
+	sdk.LogDebug(g.logger, "rate limit detail", "remaining", rateLimit.Remaining, "cost", rateLimit.Cost, "total", rateLimit.Limit)
 	return nil
 }
 
-func (g *GithubIntegration) fetchPullRequestCommits(userManager *UserManager, export sdk.Export, name string, pullRequestID string, repoID string, cursor string) ([]*sourcecode.PullRequestCommit, error) {
-	log.Info(g.logger, "need to run a pull request paginated commits starting from "+cursor, "repo", name, "pullrequest_id", pullRequestID)
+func (g *GithubIntegration) fetchPullRequestCommits(userManager *UserManager, export sdk.Export, name string, pullRequestID string, repoID string, cursor string) ([]*sdk.SourceCodePullRequestCommit, error) {
+	sdk.LogInfo(g.logger, "need to run a pull request paginated commits starting from "+cursor, "repo", name, "pullrequest_id", pullRequestID)
 	after := cursor
 	var variables = map[string]interface{}{
 		"first": defaultPullRequestCommitPageSize,
@@ -82,10 +80,10 @@ func (g *GithubIntegration) fetchPullRequestCommits(userManager *UserManager, ex
 	}
 	customerID := export.CustomerID()
 	var retryCount int
-	commits := make([]*sourcecode.PullRequestCommit, 0)
+	commits := make([]*sdk.SourceCodePullRequestCommit, 0)
 	for {
 		variables["after"] = after
-		log.Debug(g.logger, "running queued pullrequests export", "repo", name, "after", after, "limit", variables["first"], "retryCount", retryCount)
+		sdk.LogDebug(g.logger, "running queued pullrequests export", "repo", name, "after", after, "limit", variables["first"], "retryCount", retryCount)
 		var result pullrequestPagedCommitsResult
 		g.lock.Lock() // just to prevent too many GH requests
 		if err := g.client.Query(generateAllPRCommitsQuery("", after), variables, &result); err != nil {
@@ -122,7 +120,7 @@ func (g *GithubIntegration) fetchPullRequestCommits(userManager *UserManager, ex
 
 func (g *GithubIntegration) queuePullRequestJob(userManager *UserManager, repoOwner string, repoName string, repoID string, cursor string) job {
 	return func(export sdk.Export, pipe sdk.Pipe) error {
-		log.Info(g.logger, "need to run a pull request job starting from "+cursor, "name", repoName, "owner", repoOwner)
+		sdk.LogInfo(g.logger, "need to run a pull request job starting from "+cursor, "name", repoName, "owner", repoOwner)
 		var variables = map[string]interface{}{
 			"first": defaultPageSize,
 			"after": cursor,
@@ -133,7 +131,7 @@ func (g *GithubIntegration) queuePullRequestJob(userManager *UserManager, repoOw
 		fullname := repoOwner + "/" + repoName
 		var retryCount int
 		for {
-			log.Debug(g.logger, "running queued pullrequests export", "repo", fullname, "after", variables["after"], "limit", variables["first"], "retryCount", retryCount)
+			sdk.LogDebug(g.logger, "running queued pullrequests export", "repo", fullname, "after", variables["after"], "limit", variables["first"], "retryCount", retryCount)
 			var result repositoryPullrequests
 			g.lock.Lock() // just to prevent too many GH requests
 			if err := g.client.Query(pullrequestPagedQuery, variables, &result); err != nil {
@@ -164,7 +162,7 @@ func (g *GithubIntegration) queuePullRequestJob(userManager *UserManager, repoOw
 				if predge.Node.Reviews.PageInfo.HasNextPage {
 					// TODO: queue
 				}
-				commits := make([]*sourcecode.PullRequestCommit, 0)
+				commits := make([]*sdk.SourceCodePullRequestCommit, 0)
 				for _, commitedge := range predge.Node.Commits.Edges {
 					prcommit := commitedge.Node.Commit.ToModel(userManager, customerID, repoID, pullrequest.ID)
 					commits = append(commits, prcommit)
@@ -204,7 +202,7 @@ func (g *GithubIntegration) queuePullRequestJob(userManager *UserManager, repoOw
 
 // Export is called to tell the integration to run an export
 func (g *GithubIntegration) Export(export sdk.Export) error {
-	log.Info(g.logger, "export started")
+	sdk.LogInfo(g.logger, "export started")
 	pipe, err := export.Start()
 	if err != nil {
 		return err
@@ -221,7 +219,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 	g.client = g.manager.GraphQLManager().New(url, map[string]string{
 		"Authorization": "bearer " + apikey,
 	})
-	log.Debug(g.logger, "export starting", "url", url)
+	sdk.LogDebug(g.logger, "export starting", "url", url)
 
 	// first we're going to fetch all the organizations that the viewer is a member of
 	var allorgs allOrgsResult
@@ -241,7 +239,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 		}
 		break
 	}
-	log.Debug(g.logger, "found organizations", "orgs", orgs)
+	sdk.LogDebug(g.logger, "found organizations", "orgs", orgs)
 	var variables = map[string]interface{}{
 		"first": 10,
 	}
@@ -274,7 +272,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 				variables["after"] = after
 				delete(variables, "before")
 			}
-			log.Debug(g.logger, "running export", "org", login, "before", before, "after", after, "page", page, "retryCount", retryCount, "variables", variables)
+			sdk.LogDebug(g.logger, "running export", "org", login, "before", before, "after", after, "page", page, "retryCount", retryCount, "variables", variables)
 			var result allQueryResult
 			if err := g.client.Query(generateAllDataQuery(before, after), variables, &result); err != nil {
 				if g.checkForAbuseDetection(export, err) {
@@ -327,7 +325,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 					if predge.Node.Comments.PageInfo.HasNextPage {
 						// TODO: queue
 					}
-					commits := make([]*sourcecode.PullRequestCommit, 0)
+					commits := make([]*sdk.SourceCodePullRequestCommit, 0)
 					for _, commitedge := range predge.Node.Commits.Edges {
 						prcommit := commitedge.Node.Commit.ToModel(userManager, customerID, repo.ID, pullrequest.ID)
 						commits = append(commits, prcommit)
@@ -339,7 +337,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 							return err
 						}
 						commits = append(commits, morecommits...)
-						log.Debug(g.logger, "fetched pull request commits", "count", len(commits), "pullrequest_id", predge.Node.ID, "repo", repo.Name)
+						sdk.LogDebug(g.logger, "fetched pull request commits", "count", len(commits), "pullrequest_id", predge.Node.ID, "repo", repo.Name)
 					}
 					// set the commits back on the pull request
 					setPullRequestCommits(pullrequest, commits)
@@ -376,10 +374,10 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 			page++
 		}
 		// set the first cursor so we can do a before on the next incremental
-		log.Debug(g.logger, "setting the organization cursor", "org", login, "cursor", firstCursor)
+		sdk.LogDebug(g.logger, "setting the organization cursor", "org", login, "cursor", firstCursor)
 		state.Set(refType, loginCursorKey, firstCursor)
 	}
-	log.Info(g.logger, "initial export completed", "duration", time.Since(started), "repoCount", repoCount, "prCount", prCount, "reviewCount", reviewCount, "commitCount", commitCount, "commentCount", commentCount)
+	sdk.LogInfo(g.logger, "initial export completed", "duration", time.Since(started), "repoCount", repoCount, "prCount", prCount, "reviewCount", reviewCount, "commitCount", commitCount, "commentCount", commentCount)
 
 	var skipHistorical bool
 	if g.config["skip-historical"] == "true" {
@@ -404,7 +402,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 				defer wg.Done()
 				for job := range jobch {
 					if err := job(export, pipe); err != nil {
-						log.Error(g.logger, "error running job", "err", err)
+						sdk.LogError(g.logger, "error running job", "err", err)
 						errors <- err
 						return
 					}

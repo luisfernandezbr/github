@@ -3,8 +3,7 @@ package internal
 import (
 	"time"
 
-	"github.com/pinpt/go-common/datetime"
-	"github.com/pinpt/integration-sdk/sourcecode"
+	"github.com/pinpt/agent.next/sdk"
 )
 
 type pullrequestCommit struct {
@@ -18,12 +17,12 @@ type pullrequestCommit struct {
 	Committer gitUser   `json:"committer"`
 }
 
-func (c pullrequestCommit) ToModel(userManager *UserManager, customerID string, repoID string, prID string) *sourcecode.PullRequestCommit {
-	commit := &sourcecode.PullRequestCommit{}
+func (c pullrequestCommit) ToModel(userManager *UserManager, customerID string, repoID string, prID string) *sdk.SourceCodePullRequestCommit {
+	commit := &sdk.SourceCodePullRequestCommit{}
 	commit.CustomerID = customerID
 	commit.RepoID = repoID
 	commit.PullRequestID = prID
-	commit.ID = sourcecode.NewCommitID(customerID, c.Sha, refType, repoID)
+	commit.ID = sdk.NewSourceCodeCommitID(customerID, c.Sha, refType, repoID)
 	commit.Sha = c.Sha
 	commit.Message = c.Message
 	commit.Additions = c.Additions
@@ -33,8 +32,8 @@ func (c pullrequestCommit) ToModel(userManager *UserManager, customerID string, 
 	commit.URL = c.URL
 	commit.AuthorRefID = c.Author.RefID(customerID)
 	commit.CommitterRefID = c.Committer.RefID(customerID)
-	dt, _ := datetime.NewDateWithTime(c.Date)
-	commit.CreatedDate = sourcecode.PullRequestCommitCreatedDate{
+	dt, _ := sdk.NewDateWithTime(c.Date)
+	commit.CreatedDate = sdk.SourceCodePullRequestCommitCreatedDate{
 		Epoch:   dt.Epoch,
 		Rfc3339: dt.Rfc3339,
 		Offset:  dt.Offset,

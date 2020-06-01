@@ -11,7 +11,7 @@ capabilities:
   - sourcecode.PullRequest
   - sourcecode.PullRequestReview
   - sourcecode.PullRequestCommit
-  - sourcecode.PullRequestBranch
+  - sourcecode.PullRequestComment
 installation:
   modes:
     - cloud

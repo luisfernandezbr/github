@@ -3,8 +3,7 @@ package internal
 import (
 	"time"
 
-	"github.com/pinpt/go-common/datetime"
-	"github.com/pinpt/integration-sdk/sourcecode"
+	"github.com/pinpt/agent.next/sdk"
 )
 
 type pullrequestcommentsNode struct {
@@ -27,24 +26,24 @@ type pullrequestcomment struct {
 	Body      string    `json:"bodyHTML"`
 }
 
-func (c pullrequestcomment) ToModel(userManager *UserManager, customerID string, repoID string, pullRequestID string) *sourcecode.PullRequestComment {
-	comment := &sourcecode.PullRequestComment{}
+func (c pullrequestcomment) ToModel(userManager *UserManager, customerID string, repoID string, pullRequestID string) *sdk.SourceCodePullRequestComment {
+	comment := &sdk.SourceCodePullRequestComment{}
 	comment.CustomerID = customerID
 	comment.RepoID = repoID
 	comment.PullRequestID = pullRequestID
-	comment.ID = sourcecode.NewPullRequestCommentID(customerID, c.ID, refType, repoID)
+	comment.ID = sdk.NewSourceCodePullRequestCommentID(customerID, c.ID, refType, repoID)
 	comment.RefID = c.ID
 	comment.RefType = refType
 	comment.Body = c.Body
 	comment.URL = c.URL
-	cd, _ := datetime.NewDateWithTime(c.CreatedAt)
-	comment.CreatedDate = sourcecode.PullRequestCommentCreatedDate{
+	cd, _ := sdk.NewDateWithTime(c.CreatedAt)
+	comment.CreatedDate = sdk.SourceCodePullRequestCommentCreatedDate{
 		Epoch:   cd.Epoch,
 		Rfc3339: cd.Rfc3339,
 		Offset:  cd.Offset,
 	}
-	ud, _ := datetime.NewDateWithTime(c.UpdatedAt)
-	comment.UpdatedDate = sourcecode.PullRequestCommentUpdatedDate{
+	ud, _ := sdk.NewDateWithTime(c.UpdatedAt)
+	comment.UpdatedDate = sdk.SourceCodePullRequestCommentUpdatedDate{
 		Epoch:   ud.Epoch,
 		Rfc3339: ud.Rfc3339,
 		Offset:  ud.Offset,

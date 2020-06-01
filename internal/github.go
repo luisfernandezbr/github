@@ -4,12 +4,11 @@ import (
 	"sync"
 
 	"github.com/pinpt/agent.next/sdk"
-	"github.com/pinpt/go-common/log"
 )
 
 // GithubIntegration is an integration for GitHub
 type GithubIntegration struct {
-	logger  log.Logger
+	logger  sdk.Logger
 	config  sdk.Config
 	manager sdk.Manager
 	client  sdk.GraphQLClient
@@ -19,11 +18,11 @@ type GithubIntegration struct {
 var _ sdk.Integration = (*GithubIntegration)(nil)
 
 // Start is called when the integration is starting up
-func (g *GithubIntegration) Start(logger log.Logger, config sdk.Config, manager sdk.Manager) error {
+func (g *GithubIntegration) Start(logger sdk.Logger, config sdk.Config, manager sdk.Manager) error {
 	g.logger = logger
 	g.config = config
 	g.manager = manager
-	log.Info(g.logger, "starting")
+	sdk.LogInfo(g.logger, "starting")
 	return nil
 }
 
@@ -34,6 +33,6 @@ func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 
 // Stop is called when the integration is shutting down for cleanup
 func (g *GithubIntegration) Stop() error {
-	log.Info(g.logger, "stopping")
+	sdk.LogInfo(g.logger, "stopping")
 	return nil
 }

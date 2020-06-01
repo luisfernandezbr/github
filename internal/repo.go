@@ -3,8 +3,7 @@ package internal
 import (
 	"time"
 
-	"github.com/pinpt/go-common/datetime"
-	"github.com/pinpt/integration-sdk/sourcecode"
+	"github.com/pinpt/agent.next/sdk"
 )
 
 type repositoryNode struct {
@@ -30,9 +29,9 @@ type repository struct {
 	Pullrequests  pullrequests `json:"pullRequests"`
 }
 
-func (r repository) ToModel(customerID string) *sourcecode.Repo {
-	repo := &sourcecode.Repo{}
-	repo.ID = sourcecode.NewRepoID(customerID, refType, repo.ID)
+func (r repository) ToModel(customerID string) *sdk.SourceCodeRepo {
+	repo := &sdk.SourceCodeRepo{}
+	repo.ID = sdk.NewSourceCodeRepoID(customerID, repo.ID, refType)
 	repo.CustomerID = customerID
 	repo.Name = r.Name
 	repo.Description = r.Description
@@ -41,7 +40,7 @@ func (r repository) ToModel(customerID string) *sourcecode.Repo {
 	repo.Language = r.Language.Name
 	repo.DefaultBranch = r.DefaultBranch.Name
 	repo.URL = r.URL
-	repo.UpdatedAt = datetime.TimeToEpoch(r.UpdatedAt)
+	repo.UpdatedAt = sdk.TimeToEpoch(r.UpdatedAt)
 	repo.Active = !r.IsArchived
 	return repo
 }

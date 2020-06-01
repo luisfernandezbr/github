@@ -3,8 +3,7 @@ package internal
 import (
 	"time"
 
-	"github.com/pinpt/go-common/datetime"
-	"github.com/pinpt/integration-sdk/sourcecode"
+	"github.com/pinpt/agent.next/sdk"
 )
 
 type pullrequestreviewsNode struct {
@@ -26,32 +25,32 @@ type pullrequestreview struct {
 	URL       string    `json:"url"`
 }
 
-func (r pullrequestreview) ToModel(userManager *UserManager, customerID string, repoID string, prID string) *sourcecode.PullRequestReview {
-	prreview := &sourcecode.PullRequestReview{}
+func (r pullrequestreview) ToModel(userManager *UserManager, customerID string, repoID string, prID string) *sdk.SourceCodePullRequestReview {
+	prreview := &sdk.SourceCodePullRequestReview{}
 	prreview.CustomerID = customerID
-	prreview.ID = sourcecode.NewPullRequestReviewID(customerID, r.ID, refType, repoID)
+	prreview.ID = sdk.NewSourceCodePullRequestReviewID(customerID, r.ID, refType, repoID)
 	prreview.RefID = r.ID
 	prreview.RefType = refType
 	prreview.RepoID = repoID
 	prreview.PullRequestID = prID
 	prreview.URL = r.URL
-	cd, _ := datetime.NewDateWithTime(r.CreatedAt)
-	prreview.CreatedDate = sourcecode.PullRequestReviewCreatedDate{
+	cd, _ := sdk.NewDateWithTime(r.CreatedAt)
+	prreview.CreatedDate = sdk.SourceCodePullRequestReviewCreatedDate{
 		Epoch:   cd.Epoch,
 		Rfc3339: cd.Rfc3339,
 		Offset:  cd.Offset,
 	}
 	switch r.State {
 	case "PENDING":
-		prreview.State = sourcecode.PullRequestReviewStatePending
+		prreview.State = sdk.SourceCodePullRequestReviewStatePending
 	case "COMMENTED":
-		prreview.State = sourcecode.PullRequestReviewStateCommented
+		prreview.State = sdk.SourceCodePullRequestReviewStateCommented
 	case "APPROVED":
-		prreview.State = sourcecode.PullRequestReviewStateApproved
+		prreview.State = sdk.SourceCodePullRequestReviewStateApproved
 	case "CHANGES_REQUESTED":
-		prreview.State = sourcecode.PullRequestReviewStateChangesRequested
+		prreview.State = sdk.SourceCodePullRequestReviewStateChangesRequested
 	case "DISMISSED":
-		prreview.State = sourcecode.PullRequestReviewStateDismissed
+		prreview.State = sdk.SourceCodePullRequestReviewStateDismissed
 	}
 	prreview.UserRefID = r.Author.RefID(customerID)
 	userManager.emitAuthor(r.Author)
