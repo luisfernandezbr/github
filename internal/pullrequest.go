@@ -119,24 +119,33 @@ type repositoryPullrequests struct {
 	RateLimit  rateLimit  `json:"rateLimit"`
 }
 
+type pullrequestNode struct {
+	Cursor string
+	Node   pullrequest
+}
+
 type pullrequests struct {
 	TotalCount int
 	PageInfo   pageInfo
-	Nodes      []pullrequest
+	Edges      []pullrequestNode
 }
 
 type pullrequestPagedCommit struct {
 	Commit pullrequestCommit `json:"commit"`
 }
-
 type pullrequestPagedCommitNode struct {
-	Nodes []pullrequestPagedCommit `json:"nodes"`
+	Node pullrequestPagedCommit
+}
+
+type pullrequestPagedCommitEdges struct {
+	Cursor string
+	Edges  []pullrequestPagedCommitNode `json:"edges"`
 }
 
 type pullrequestPagedCommits struct {
 	TotalCount int
 	PageInfo   pageInfo
-	Commits    pullrequestPagedCommitNode `json:"commits"`
+	Commits    pullrequestPagedCommitEdges `json:"commits"`
 }
 
 type pullrequestPagedCommitsResult struct {

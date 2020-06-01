@@ -48,8 +48,13 @@ type pullrequestcommit struct {
 	Commit pullrequestCommit `json:"commit"`
 }
 
+type pullrequestcommitNode struct {
+	Cursor string
+	Node   pullrequestcommit
+}
+
 type pullrequestcommits struct {
 	TotalCount int
 	PageInfo   pageInfo
-	Nodes      []pullrequestcommit
+	Edges      []pullrequestcommitNode
 }

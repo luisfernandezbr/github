@@ -7,10 +7,15 @@ import (
 	"github.com/pinpt/integration-sdk/sourcecode"
 )
 
+type repositoryNode struct {
+	Cursor string
+	Node   repository
+}
+
 type repositories struct {
 	TotalCount int
 	PageInfo   pageInfo
-	Nodes      []repository
+	Edges      []repositoryNode
 }
 
 type repository struct {

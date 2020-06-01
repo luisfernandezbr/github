@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -8,6 +9,7 @@ const refType = "github"
 
 type pageInfo struct {
 	HasNextPage bool   `json:"hasNextPage"`
+	StartCursor string `json:"startCursor"`
 	EndCursor   string `json:"endCursor"`
 }
 
@@ -47,118 +49,144 @@ query GetPullRequests($name: String!, $owner: String!, $first: Int!, $after: Str
 			totalCount
 			pageInfo {
 				hasNextPage
+				startCursor
 				endCursor
 			}
-			nodes {
-				id
-				bodyHTML
-				url
-				closed
-				draft: isDraft
-				locked
-				merged
-				number
-				state
-				title
-				createdAt
-				updatedAt
-				mergedAt
-				branch: headRefName
-				mergeCommit {
-					oid
-				}
-				mergedBy {
-					type: __typename
-					avatarUrl
-					login
+			edges {
+				cursor
+				node {
+					id
+					bodyHTML
 					url
-					...on User {
-						id
-						email
-						name
+					closed
+					draft: isDraft
+					locked
+					merged
+					number
+					state
+					title
+					createdAt
+					updatedAt
+					mergedAt
+					branch: headRefName
+					mergeCommit {
+						oid
 					}
-				}
-				author {
-					type: __typename
-					avatarUrl
-					login
-					url
-					...on User {
-						id
-						email
-						name
+					mergedBy {
+						type: __typename
+						avatarUrl
+						login
+						url
+						...on User {
+							id
+							email
+							name
+						}
 					}
-				}
-				commits(first: 10) {
-					totalCount
-					pageInfo {
-						hasNextPage
-						endCursor
+					author {
+						type: __typename
+						avatarUrl
+						login
+						url
+						...on User {
+							id
+							email
+							name
+						}
 					}
-					nodes {
-						commit {
-							sha: oid
-							message
-							authoredDate
-							additions
-							deletions
-							url
-							author {
-								avatarUrl
-								email
-								name
-								user {
-									id
-									login
-								}
-							}
-							committer {
-								avatarUrl
-								email
-								name
-								user {
-									id
-									login
+					commits(first: 10) {
+						totalCount
+						pageInfo {
+							hasNextPage
+							startCursor
+							endCursor
+						}
+						edges {
+							cursor
+							node {
+								commit {
+									sha: oid
+									message
+									authoredDate
+									additions
+									deletions
+									url
+									author {
+										avatarUrl
+										email
+										name
+										user {
+											id
+											login
+										}
+									}
+									committer {
+										avatarUrl
+										email
+										name
+										user {
+											id
+											login
+										}
+									}
 								}
 							}
 						}
 					}
-				}
-				reviews(first: 10) {
-					nodes {
-						id
-						state
-						createdAt
-						url
-						author {
-							type: __typename
-							avatarUrl
-							login
-							url
-							...on User {
+					reviews(first: 10) {
+						totalCount
+						pageInfo {
+							hasNextPage
+							startCursor
+							endCursor
+						}
+						edges {
+							cursor
+							node {
 								id
-								email
-								name
+								state
+								createdAt
+								url
+								author {
+									type: __typename
+									avatarUrl
+									login
+									url
+									...on User {
+										id
+										email
+										name
+									}
+								}
 							}
 						}
 					}
-				}
-				comments(first: 10) {
-					nodes {
-						id
-						createdAt
-						updatedAt
-						url
-						bodyHTML
-						author {
-							type: __typename
-							avatarUrl
-							login
-							url
-							...on User {
+					comments(first: 10) {
+						totalCount
+						pageInfo {
+							hasNextPage
+							startCursor
+							endCursor
+						}
+						edges {
+							cursor
+							node {
 								id
-								email
-								name
+								createdAt
+								updatedAt
+								url
+								bodyHTML
+								author {
+									type: __typename
+									avatarUrl
+									login
+									url
+									...on User {
+										id
+										email
+										name
+									}
+								}
 							}
 						}
 					}
@@ -195,40 +223,53 @@ type organizations struct {
 	Nodes []org `json:"nodes"`
 }
 
-var allPRCommitsQuery = `
-query GetAllPRCommits($id: ID!, $first: Int!, $after: String) {
+func generateAllPRCommitsQuery(before string, after string) string {
+	var definitionLine, argLine string
+	if before != "" {
+		definitionLine = ", $before: String! "
+		argLine = " before: $before "
+	}
+	if after != "" {
+		definitionLine = ", $after: String! "
+		argLine = " after: $after "
+	}
+	return fmt.Sprintf(`query GetAllPRCommits($id: ID!, $first: Int! %s) {
 	node(id: $id) {
 		...on PullRequest {
-			commits(first: $first after: $after) {
+			commits(first: $first %s) {
 				totalCount
 				pageInfo {
 					hasNextPage
+					startCursor
 					endCursor
 				}
-				nodes {
-					commit {
-						sha: oid
-						message
-						authoredDate
-						additions
-						deletions
-						url
-						author {
-							avatarUrl
-							email
-							name
-							user {
-								id
-								login
+				edges {
+					cursor
+					node {
+						commit {
+							sha: oid
+							message
+							authoredDate
+							additions
+							deletions
+							url
+							author {
+								avatarUrl
+								email
+								name
+								user {
+									id
+									login
+								}
 							}
-						}
-						committer {
-							avatarUrl
-							email
-							name
-							user {
-								id
-								login
+							committer {
+								avatarUrl
+								email
+								name
+								user {
+									id
+									login
+								}
 							}
 						}
 					}
@@ -243,12 +284,13 @@ query GetAllPRCommits($id: ID!, $first: Int!, $after: String) {
 		resetAt
 	}
 }
-`
+`, definitionLine, argLine)
+}
 
 var allOrgsQuery = `
-query GetAllOrgs($first: Int!, $after: String) {
+query GetAllOrgs($first: Int!) {
 	viewer {
-		organizations(first: $first after: $after) {
+		organizations(first: $first) {
 			nodes {
 				name
 				login
@@ -260,155 +302,185 @@ query GetAllOrgs($first: Int!, $after: String) {
 }
 `
 
-var allDataQuery = `
-query GetAllData($login: String!, $first: Int!, $after: String) {
-	organization(login: $login) {
-		repositories(first: $first, after: $after, isFork: false, orderBy: {field: UPDATED_AT, direction: DESC}) {
-			totalCount
-			pageInfo {
-				hasNextPage
-				endCursor
-			}
-			nodes {
-				id
-				nameWithOwner
-				url
-				updatedAt
-				description
-				defaultBranchRef {
-					name
+func generateAllDataQuery(before string, after string) string {
+	var definitionLine, argLine string
+	if before != "" {
+		definitionLine = ", $before: String! "
+		argLine = " before: $before "
+	}
+	if after != "" {
+		definitionLine = ", $after: String! "
+		argLine = " after: $after "
+	}
+	return fmt.Sprintf(`
+	query GetAllData($login: String!, $first: Int! %s) {
+		organization(login: $login) {
+			repositories(first: $first %s isFork: false orderBy: {field: UPDATED_AT, direction: DESC}) {
+				totalCount
+				pageInfo {
+					hasNextPage
+					startCursor
+					endCursor
 				}
-				primaryLanguage {
-					name
-				}
-				isArchived
-
-				pullRequests(first: 10, orderBy: {field: UPDATED_AT, direction: DESC}) {
-					totalCount
-					pageInfo {
-						hasNextPage
-						endCursor
-					}
-					nodes {
+				edges {
+					cursor
+					node {
 						id
-						bodyHTML
+						nameWithOwner
 						url
-						closed
-						draft: isDraft
-						locked
-						merged
-						number
-						state
-						title
-						createdAt
 						updatedAt
-						mergedAt
-						branch: headRefName
-						mergeCommit {
-							oid
+						description
+						defaultBranchRef {
+							name
 						}
-						mergedBy {
-							type: __typename
-							avatarUrl
-							login
-							url
-							...on User {
-								id
-								email
-								name
-							}
+						primaryLanguage {
+							name
 						}
-						author {
-							type: __typename
-							avatarUrl
-							login
-							url
-							...on User {
-								id
-								email
-								name
-							}
-						}
-						commits(first: 10) {
+						isArchived
+						pullRequests(first: 10, orderBy: {field: UPDATED_AT, direction: DESC}) {
 							totalCount
 							pageInfo {
 								hasNextPage
+								startCursor
 								endCursor
 							}
-							nodes {
-								commit {
-									sha: oid
-									message
-									authoredDate
-									additions
-									deletions
+							edges {
+								cursor
+								node {
+									id
+									bodyHTML
 									url
+									closed
+									draft: isDraft
+									locked
+									merged
+									number
+									state
+									title
+									createdAt
+									updatedAt
+									mergedAt
+									branch: headRefName
+									mergeCommit {
+										oid
+									}
+									mergedBy {
+										type: __typename
+										avatarUrl
+										login
+										url
+										...on User {
+											id
+											email
+											name
+										}
+									}
 									author {
+										type: __typename
 										avatarUrl
-										email
-										name
-										user {
+										login
+										url
+										...on User {
 											id
-											login
+											email
+											name
 										}
 									}
-									committer {
-										avatarUrl
-										email
-										name
-										user {
-											id
-											login
+									commits(first: 10) {
+										totalCount
+										pageInfo {
+											hasNextPage
+											startCursor
+											endCursor
+										}
+										edges {
+											cursor
+											node {
+												commit {
+													sha: oid
+													message
+													authoredDate
+													additions
+													deletions
+													url
+													author {
+														avatarUrl
+														email
+														name
+														user {
+															id
+															login
+														}
+													}
+													committer {
+														avatarUrl
+														email
+														name
+														user {
+															id
+															login
+														}
+													}
+												}
+											}
 										}
 									}
-								}
-							}
-						}
-						reviews(first: 10) {
-							totalCount
-							pageInfo {
-								hasNextPage
-								endCursor
-							}
-							nodes {
-								id
-								state
-								createdAt
-								url
-								author {
-									type: __typename
-									avatarUrl
-									login
-									url
-									...on User {
-										id
-										email
-										name
+									reviews(first: 10) {
+										totalCount
+										pageInfo {
+											hasNextPage
+											startCursor
+											endCursor
+										}
+										edges {
+											cursor
+											node {
+												id
+												state
+												createdAt
+												url
+												author {
+													type: __typename
+													avatarUrl
+													login
+													url
+													...on User {
+														id
+														email
+														name
+													}
+												}
+											}
+										}
 									}
-								}
-							}
-						}
-						comments(first: 10) {
-							totalCount
-							pageInfo {
-								hasNextPage
-								endCursor
-							}
-							nodes {
-								id
-								createdAt
-								updatedAt
-								url
-								bodyHTML
-								author {
-									type: __typename
-									avatarUrl
-									login
-									url
-									...on User {
-										id
-										email
-										name
+									comments(first: 10) {
+										totalCount
+										pageInfo {
+											hasNextPage
+											startCursor
+											endCursor
+										}
+										edges {
+											cursor
+											node {
+												id
+												createdAt
+												updatedAt
+												url
+												bodyHTML
+												author {
+													type: __typename
+													avatarUrl
+													login
+													url
+													...on User {
+														id
+														email
+														name
+													}
+												}
+											}
+										}
 									}
 								}
 							}
@@ -417,12 +489,12 @@ query GetAllData($login: String!, $first: Int!, $after: String) {
 				}
 			}
 		}
+		rateLimit {
+			limit
+			cost
+			remaining
+			resetAt
+		}
 	}
-	rateLimit {
-		limit
-		cost
-		remaining
-		resetAt
-	}
+	`, definitionLine, argLine)
 }
-`

@@ -7,10 +7,15 @@ import (
 	"github.com/pinpt/integration-sdk/sourcecode"
 )
 
+type pullrequestcommentsNode struct {
+	Cursor string
+	Node   pullrequestcomment
+}
+
 type pullrequestcomments struct {
 	TotalCount int
 	PageInfo   pageInfo
-	Nodes      []pullrequestcomment
+	Edges      []pullrequestcommentsNode
 }
 
 type pullrequestcomment struct {

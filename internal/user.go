@@ -133,9 +133,11 @@ func (u *UserManager) emitGitUser(author gitUser) error {
 			if err := u.integration.client.Query(getUserOrgsQuery, map[string]interface{}{"id": author.User.ID}, &result); err != nil {
 				u.mu.Unlock()
 				if u.integration.checkForAbuseDetection(u.export, err) {
+					u.mu.Lock()
 					continue
 				}
 				if u.integration.checkForRetryableError(u.export, err) {
+					u.mu.Lock()
 					continue
 				}
 				log.Error(u.integration.logger, "error fetching user", "err", err, "ref_id", refID)

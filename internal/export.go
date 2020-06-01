@@ -75,19 +75,20 @@ func (g *GithubIntegration) checkForRateLimit(export sdk.Export, rateLimit rateL
 
 func (g *GithubIntegration) fetchPullRequestCommits(userManager *UserManager, export sdk.Export, name string, pullRequestID string, repoID string, cursor string) ([]*sourcecode.PullRequestCommit, error) {
 	log.Info(g.logger, "need to run a pull request paginated commits starting from "+cursor, "repo", name, "pullrequest_id", pullRequestID)
+	after := cursor
 	var variables = map[string]interface{}{
 		"first": defaultPullRequestCommitPageSize,
-		"after": cursor,
 		"id":    pullRequestID,
 	}
 	customerID := export.CustomerID()
 	var retryCount int
 	commits := make([]*sourcecode.PullRequestCommit, 0)
 	for {
-		log.Debug(g.logger, "running queued pullrequests export", "repo", name, "after", variables["after"], "limit", variables["first"], "retryCount", retryCount)
+		variables["after"] = after
+		log.Debug(g.logger, "running queued pullrequests export", "repo", name, "after", after, "limit", variables["first"], "retryCount", retryCount)
 		var result pullrequestPagedCommitsResult
 		g.lock.Lock() // just to prevent too many GH requests
-		if err := g.client.Query(allPRCommitsQuery, variables, &result); err != nil {
+		if err := g.client.Query(generateAllPRCommitsQuery("", after), variables, &result); err != nil {
 			g.lock.Unlock()
 			if g.checkForAbuseDetection(export, err) {
 				continue
@@ -104,8 +105,8 @@ func (g *GithubIntegration) fetchPullRequestCommits(userManager *UserManager, ex
 		}
 		g.lock.Unlock()
 		retryCount = 0
-		for _, node := range result.Node.Commits.Nodes {
-			prcommit := node.Commit.ToModel(userManager, customerID, repoID, pullRequestID)
+		for _, edge := range result.Node.Commits.Edges {
+			prcommit := edge.Node.Commit.ToModel(userManager, customerID, repoID, pullRequestID)
 			commits = append(commits, prcommit)
 		}
 		if err := g.checkForRateLimit(export, result.RateLimit); err != nil {
@@ -114,7 +115,7 @@ func (g *GithubIntegration) fetchPullRequestCommits(userManager *UserManager, ex
 		if !result.Node.PageInfo.HasNextPage {
 			break
 		}
-		variables["after"] = result.Node.PageInfo.EndCursor
+		after = result.Node.PageInfo.EndCursor
 	}
 	return commits, nil
 }
@@ -152,25 +153,25 @@ func (g *GithubIntegration) queuePullRequestJob(userManager *UserManager, repoOw
 			}
 			g.lock.Unlock()
 			retryCount = 0
-			for _, prnode := range result.Repository.Pullrequests.Nodes {
-				pullrequest := prnode.ToModel(userManager, customerID, fullname, repoID)
-				for _, reviewnode := range prnode.Reviews.Nodes {
-					prreview := reviewnode.ToModel(userManager, customerID, repoID, pullrequest.ID)
+			for _, predge := range result.Repository.Pullrequests.Edges {
+				pullrequest := predge.Node.ToModel(userManager, customerID, fullname, repoID)
+				for _, reviewedge := range predge.Node.Reviews.Edges {
+					prreview := reviewedge.Node.ToModel(userManager, customerID, repoID, pullrequest.ID)
 					if err := pipe.Write(prreview); err != nil {
 						return err
 					}
 				}
-				if prnode.Reviews.PageInfo.HasNextPage {
+				if predge.Node.Reviews.PageInfo.HasNextPage {
 					// TODO: queue
 				}
 				commits := make([]*sourcecode.PullRequestCommit, 0)
-				for _, commitnode := range prnode.Commits.Nodes {
-					prcommit := commitnode.Commit.ToModel(userManager, customerID, repoID, pullrequest.ID)
+				for _, commitedge := range predge.Node.Commits.Edges {
+					prcommit := commitedge.Node.Commit.ToModel(userManager, customerID, repoID, pullrequest.ID)
 					commits = append(commits, prcommit)
 				}
-				if prnode.Commits.PageInfo.HasNextPage {
+				if predge.Node.Commits.PageInfo.HasNextPage {
 					// fetch all the remaining paged commits
-					morecommits, err := g.fetchPullRequestCommits(userManager, export, fullname, prnode.ID, pullrequest.RepoID, prnode.Commits.PageInfo.EndCursor)
+					morecommits, err := g.fetchPullRequestCommits(userManager, export, fullname, predge.Node.ID, pullrequest.RepoID, predge.Node.Commits.PageInfo.EndCursor)
 					if err != nil {
 						return err
 					}
@@ -234,28 +235,48 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 			return nil
 		}
 		for _, node := range allorgs.Viewer.Organizations.Nodes {
-			orgs = append(orgs, node.Login)
+			if node.IsMember {
+				orgs = append(orgs, node.Login)
+			}
 		}
 		break
 	}
+	log.Debug(g.logger, "found organizations", "orgs", orgs)
 	var variables = map[string]interface{}{
 		"first": 10,
 	}
+	state := export.State()
 	customerID := export.CustomerID()
 	userManager := NewUserManager(customerID, orgs, export, pipe, g)
 	jobs := make([]job, 0)
 	started := time.Now()
+	makeCursorKey := func(object string) string {
+		return "cursor:" + object
+	}
+	// TODO: need to handle storing each object in state and then comparing on an incremental
+	// for comments, commits, etc.
 	var repoCount, prCount, reviewCount, commitCount, commentCount int
-	for _, orgnode := range allorgs.Viewer.Organizations.Nodes {
-		if !orgnode.IsMember {
-			continue
+	var before, after string
+	for _, login := range orgs {
+		variables["login"] = login
+		loginCursorKey := makeCursorKey("org_" + login)
+		if _, err := state.Get(refType, loginCursorKey, &before); err != nil {
+			return err
 		}
-		variables["login"] = orgnode.Login
+		var firstCursor string
 		var page, retryCount int
 		for {
-			log.Debug(g.logger, "running export", "org", orgnode.Login, "after", variables["after"], "page", page, "retryCount", retryCount)
+			if before != "" {
+				variables["before"] = before
+				delete(variables, "after")
+			}
+			if after != "" {
+				variables["after"] = after
+				delete(variables, "before")
+			}
+			log.Debug(g.logger, "running export", "org", login, "before", before, "after", after, "page", page, "retryCount", retryCount, "variables", variables)
 			var result allQueryResult
-			if err := g.client.Query(allDataQuery, variables, &result); err != nil {
+			if err := g.client.Query(generateAllDataQuery(before, after), variables, &result); err != nil {
 				if g.checkForAbuseDetection(export, err) {
 					continue
 				}
@@ -263,59 +284,62 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 					retryCount++
 					variables["first"] = 1 // back off the page size to see if this will help
 					if retryCount >= 10 {
-						return fmt.Errorf("failed to export after retrying 10 times for %s", orgnode.Login)
+						return fmt.Errorf("failed to export after retrying 10 times for %s", login)
 					}
 					continue
 				}
 				export.Completed(err)
 				return nil
 			}
+			if page == 0 {
+				firstCursor = result.Organization.Repositories.PageInfo.StartCursor
+			}
 			retryCount = 0
-			for _, node := range result.Organization.Repositories.Nodes {
+			for _, edge := range result.Organization.Repositories.Edges {
 				repoCount++
-				repo := node.ToModel(customerID)
+				repo := edge.Node.ToModel(customerID)
 				if err := pipe.Write(repo); err != nil {
 					return err
 				}
-				if node.IsArchived {
+				if edge.Node.IsArchived {
 					// skip archived for now (but still send the repo)
 					continue
 				}
-				for _, prnode := range node.Pullrequests.Nodes {
-					pullrequest := prnode.ToModel(userManager, customerID, node.Name, repo.ID)
-					for _, reviewnode := range prnode.Reviews.Nodes {
-						prreview := reviewnode.ToModel(userManager, customerID, repo.ID, pullrequest.ID)
+				for _, predge := range edge.Node.Pullrequests.Edges {
+					pullrequest := predge.Node.ToModel(userManager, customerID, edge.Node.Name, repo.ID)
+					for _, reviewedge := range predge.Node.Reviews.Edges {
+						prreview := reviewedge.Node.ToModel(userManager, customerID, repo.ID, pullrequest.ID)
 						if err := pipe.Write(prreview); err != nil {
 							return err
 						}
 						reviewCount++
 					}
-					if prnode.Reviews.PageInfo.HasNextPage {
+					if predge.Node.Reviews.PageInfo.HasNextPage {
 						// TODO: queue
 					}
-					for _, commentnode := range prnode.Comments.Nodes {
-						prcomment := commentnode.ToModel(userManager, customerID, repo.ID, pullrequest.ID)
+					for _, commentedge := range predge.Node.Comments.Edges {
+						prcomment := commentedge.Node.ToModel(userManager, customerID, repo.ID, pullrequest.ID)
 						if err := pipe.Write(prcomment); err != nil {
 							return err
 						}
 						commentCount++
 					}
-					if prnode.Comments.PageInfo.HasNextPage {
+					if predge.Node.Comments.PageInfo.HasNextPage {
 						// TODO: queue
 					}
 					commits := make([]*sourcecode.PullRequestCommit, 0)
-					for _, commitnode := range prnode.Commits.Nodes {
-						prcommit := commitnode.Commit.ToModel(userManager, customerID, repo.ID, pullrequest.ID)
+					for _, commitedge := range predge.Node.Commits.Edges {
+						prcommit := commitedge.Node.Commit.ToModel(userManager, customerID, repo.ID, pullrequest.ID)
 						commits = append(commits, prcommit)
 					}
-					if prnode.Commits.PageInfo.HasNextPage {
+					if predge.Node.Commits.PageInfo.HasNextPage {
 						// fetch all the remaining paged commits
-						morecommits, err := g.fetchPullRequestCommits(userManager, export, repo.Name, prnode.ID, pullrequest.RepoID, prnode.Commits.PageInfo.EndCursor)
+						morecommits, err := g.fetchPullRequestCommits(userManager, export, repo.Name, predge.Node.ID, pullrequest.RepoID, predge.Node.Commits.PageInfo.EndCursor)
 						if err != nil {
 							return err
 						}
 						commits = append(commits, morecommits...)
-						log.Debug(g.logger, "fetched pull request commits", "count", len(commits), "pullrequest_id", prnode.ID, "repo", repo.Name)
+						log.Debug(g.logger, "fetched pull request commits", "count", len(commits), "pullrequest_id", predge.Node.ID, "repo", repo.Name)
 					}
 					// set the commits back on the pull request
 					setPullRequestCommits(pullrequest, commits)
@@ -332,10 +356,10 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 					}
 					prCount++
 				}
-				if node.Pullrequests.PageInfo.HasNextPage {
-					tok := strings.Split(node.Name, "/")
+				if edge.Node.Pullrequests.PageInfo.HasNextPage {
+					tok := strings.Split(edge.Node.Name, "/")
 					// queue the pull requests for the next page
-					jobs = append(jobs, g.queuePullRequestJob(userManager, tok[0], tok[1], repo.GetID(), node.Pullrequests.PageInfo.EndCursor))
+					jobs = append(jobs, g.queuePullRequestJob(userManager, tok[0], tok[1], repo.GetID(), edge.Node.Pullrequests.PageInfo.EndCursor))
 				}
 			}
 			// check to see if we are at the end of our pagination
@@ -347,9 +371,13 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 				export.Completed(err)
 				return nil
 			}
-			variables["after"] = result.Organization.Repositories.PageInfo.EndCursor
+			after = result.Organization.Repositories.PageInfo.EndCursor
+			before = ""
 			page++
 		}
+		// set the first cursor so we can do a before on the next incremental
+		log.Debug(g.logger, "setting the organization cursor", "org", login, "cursor", firstCursor)
+		state.Set(refType, loginCursorKey, firstCursor)
 	}
 	log.Info(g.logger, "initial export completed", "duration", time.Since(started), "repoCount", repoCount, "prCount", prCount, "reviewCount", reviewCount, "commitCount", commitCount, "commentCount", commentCount)
 
