@@ -208,12 +208,12 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 		return err
 	}
 	config := export.Config()
-	url := config["url"]
-	if url == "" {
+	ok, url := config.GetString("url")
+	if !ok {
 		url = "https://api.github.com/graphql"
 	}
-	apikey := config["api_key"]
-	if apikey == "" {
+	ok, apikey := config.GetString("api_key")
+	if !ok {
 		return fmt.Errorf("required api_key not found")
 	}
 	g.client = g.manager.GraphQLManager().New(url, map[string]string{
@@ -379,10 +379,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 	}
 	sdk.LogInfo(g.logger, "initial export completed", "duration", time.Since(started), "repoCount", repoCount, "prCount", prCount, "reviewCount", reviewCount, "commitCount", commitCount, "commentCount", commentCount)
 
-	var skipHistorical bool
-	if g.config["skip-historical"] == "true" {
-		skipHistorical = true
-	}
+	_, skipHistorical := g.config.GetBool("skip-historical")
 
 	if !skipHistorical {
 
