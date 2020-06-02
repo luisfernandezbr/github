@@ -19,7 +19,7 @@ var _ sdk.Integration = (*GithubIntegration)(nil)
 
 // Start is called when the integration is starting up
 func (g *GithubIntegration) Start(logger sdk.Logger, config sdk.Config, manager sdk.Manager) error {
-	g.logger = logger
+	g.logger = sdk.LogWith(logger, "pkg", "github")
 	g.config = config
 	g.manager = manager
 	sdk.LogInfo(g.logger, "starting")
