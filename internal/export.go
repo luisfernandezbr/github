@@ -209,7 +209,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 	}
 	config := export.Config()
 	ok, url := config.GetString("url")
-	if !ok {
+	if !ok || url == "" {
 		url = "https://api.github.com/graphql"
 	}
 	ok, apikey := config.GetString("api_key")
