@@ -415,15 +415,10 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 		// check to see if we had an early exit
 		select {
 		case err := <-errors:
-			pipe.Close()
 			return err
 		default:
 		}
 	}
 
-	// finish it up
-	if err := pipe.Close(); err != nil {
-		return err
-	}
 	return nil
 }
