@@ -257,7 +257,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 	for _, login := range orgs {
 		variables["login"] = login
 		loginCursorKey := makeCursorKey("org_" + login)
-		if _, err := state.Get(refType, loginCursorKey, &before); err != nil {
+		if _, err := state.Get(loginCursorKey, &before); err != nil {
 			return err
 		}
 		var firstCursor string
@@ -372,7 +372,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 		}
 		// set the first cursor so we can do a before on the next incremental
 		sdk.LogDebug(g.logger, "setting the organization cursor", "org", login, "cursor", firstCursor)
-		state.Set(refType, loginCursorKey, firstCursor)
+		state.Set(loginCursorKey, firstCursor)
 	}
 	sdk.LogInfo(g.logger, "initial export completed", "duration", time.Since(started), "repoCount", repoCount, "prCount", prCount, "reviewCount", reviewCount, "commitCount", commitCount, "commentCount", commentCount)
 
