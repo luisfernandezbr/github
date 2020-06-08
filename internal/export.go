@@ -203,7 +203,7 @@ func (g *GithubIntegration) queuePullRequestJob(userManager *UserManager, repoOw
 // Export is called to tell the integration to run an export
 func (g *GithubIntegration) Export(export sdk.Export) error {
 	sdk.LogInfo(g.logger, "export started")
-	pipe, err := export.Start()
+	pipe, err := export.Pipe()
 	if err != nil {
 		return err
 	}
@@ -229,8 +229,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 			if g.checkForAbuseDetection(export, err) {
 				continue
 			}
-			export.Completed(err)
-			return nil
+			return err
 		}
 		for _, node := range allorgs.Viewer.Organizations.Nodes {
 			if node.IsMember {
@@ -286,8 +285,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 					}
 					continue
 				}
-				export.Completed(err)
-				return nil
+				return err
 			}
 			if page == 0 {
 				firstCursor = result.Organization.Repositories.PageInfo.StartCursor
@@ -366,8 +364,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 			}
 			if err := g.checkForRateLimit(export, result.RateLimit); err != nil {
 				pipe.Close()
-				export.Completed(err)
-				return nil
+				return err
 			}
 			after = result.Organization.Repositories.PageInfo.EndCursor
 			before = ""
@@ -419,8 +416,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 		select {
 		case err := <-errors:
 			pipe.Close()
-			export.Completed(err)
-			return nil
+			return err
 		default:
 		}
 	}
@@ -429,6 +425,5 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 	if err := pipe.Close(); err != nil {
 		return err
 	}
-	export.Completed(nil)
 	return nil
 }
