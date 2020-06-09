@@ -203,10 +203,7 @@ func (g *GithubIntegration) queuePullRequestJob(userManager *UserManager, repoOw
 // Export is called to tell the integration to run an export
 func (g *GithubIntegration) Export(export sdk.Export) error {
 	sdk.LogInfo(g.logger, "export started")
-	pipe, err := export.Pipe()
-	if err != nil {
-		return err
-	}
+	pipe := export.Pipe()
 	config := export.Config()
 	ok, url := config.GetString("url")
 	if !ok || url == "" {

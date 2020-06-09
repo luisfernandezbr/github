@@ -26,6 +26,18 @@ func (g *GithubIntegration) Start(logger sdk.Logger, config sdk.Config, manager 
 	return nil
 }
 
+// Enroll is called when a new integration instance is added
+func (g *GithubIntegration) Enroll(instance sdk.Instance) error {
+	// FIXME: add the web hook for this integration
+	return nil
+}
+
+// Dismiss is called when an existing integration instance is removed
+func (g *GithubIntegration) Dismiss(instance sdk.Instance) error {
+	// FIXME: remove integration
+	return nil
+}
+
 // WebHook is called when a webhook is received on behalf of the integration
 func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 	return nil
