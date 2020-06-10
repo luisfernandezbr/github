@@ -302,14 +302,12 @@ github.com/pierrec/lz4 v1.0.2-0.20190131084431-473cd7ce01a1/go.mod h1:3/3N9NVKO0
 github.com/pierrec/lz4 v2.0.5+incompatible/go.mod h1:pdkljMzZIN41W+lC3N2tnIh5sFi+IEE17M5jbnwPHcY=
 github.com/pinpt/go-common/v10 v10.0.0 h1:JKbeuEMspdiA3ecD4r5/llTKw60mrIgpzd4AdgUB4eQ=
 github.com/pinpt/go-common/v10 v10.0.0/go.mod h1:RnAbLiBmrNNYIKUvp6pnWAtn4f7IRoXa49cFpHmaTFs=
-github.com/pinpt/go-common/v10 v10.0.3 h1:adSmYB3+kl2JaLugk13sMW9CSgJlHyCEZG8E30jNn48=
-github.com/pinpt/go-common/v10 v10.0.3/go.mod h1:uRe9KzBE26kjqD+2UgreBQqesesXyBUEIjBT2NEK3kk=
+github.com/pinpt/go-common/v10 v10.0.4 h1:pQ18EXTOAOju2VnZ5z2VIAlIAA0NKQDCq/ovS1aDWzk=
+github.com/pinpt/go-common/v10 v10.0.4/go.mod h1:uRe9KzBE26kjqD+2UgreBQqesesXyBUEIjBT2NEK3kk=
 github.com/pinpt/httpclient v0.0.0-20190815022759-09e0028c9067 h1:GG0k6rjX7ywCwYnjVudy3OXXivcMAih8s08+sDrQiEE=
 github.com/pinpt/httpclient v0.0.0-20190815022759-09e0028c9067/go.mod h1:SzzGa0kOT+frqT6ABgV69U9+jlMU98XkmKup+HEZRVI=
-github.com/pinpt/integration-sdk v0.0.1005 h1:ohAnUDA+G75k+hIw52iOYEmP7ALHJwRaHn7yDghUOOk=
-github.com/pinpt/integration-sdk v0.0.1005/go.mod h1:GvEOhGTIbb2cYGBL/dvtxd/2/ocMPKewWDLaAhr9m1M=
-github.com/pinpt/integration-sdk v0.0.1006 h1:CsAs8d/zpBn7j07mv65CKVPD3DPl/0Kie/61ftbweUA=
-github.com/pinpt/integration-sdk v0.0.1006/go.mod h1:GvEOhGTIbb2cYGBL/dvtxd/2/ocMPKewWDLaAhr9m1M=
+github.com/pinpt/integration-sdk v0.0.1012 h1:E0JY7nx7jc1XkuLOxMVHG+1o0wJimI1ZiN5ZXbTkGZI=
+github.com/pinpt/integration-sdk v0.0.1012/go.mod h1:GvEOhGTIbb2cYGBL/dvtxd/2/ocMPKewWDLaAhr9m1M=
 github.com/pkg/browser v0.0.0-20180916011732-0a3d74bf9ce4 h1:49lOXmGaUpV9Fz3gd7TFZY106KVlPVa5jcYD1gaQf98=
 github.com/pkg/browser v0.0.0-20180916011732-0a3d74bf9ce4/go.mod h1:4OwLy04Bl9Ef3GJJCoec+30X3LQs/0/m4HFRt/2LUSA=
 github.com/pkg/errors v0.8.0/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
@@ -432,6 +430,7 @@ golang.org/x/crypto v0.0.0-20190530122614-20be4c3c3ed5/go.mod h1:yigFU9vqHzYiE8U
 golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4/go.mod h1:yigFU9vqHzYiE8UmvKecakEJjdnWj3jj499lnFckfCI=
 golang.org/x/crypto v0.0.0-20191010185427-af544f31c8ac/go.mod h1:yigFU9vqHzYiE8UmvKecakEJjdnWj3jj499lnFckfCI=
 golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550/go.mod h1:yigFU9vqHzYiE8UmvKecakEJjdnWj3jj499lnFckfCI=
+golang.org/x/crypto v0.0.0-20200604202706-70a84ac30bf9 h1:vEg9joUBmeBcK9iSJftGNf3coIG4HqZElCPehJsfAYM=
 golang.org/x/crypto v0.0.0-20200604202706-70a84ac30bf9/go.mod h1:LzIPMQfyMNhhGPhUkYOs5KpL4U8rLKemX1yGLhDgUto=
 golang.org/x/exp v0.0.0-20190121172915-509febef88a4/go.mod h1:CJ0aWSM057203Lf6IL+f9T1iT9GByDxfZKAQTCR3kQA=
 golang.org/x/lint v0.0.0-20181026193005-c67002cb31c3/go.mod h1:UVdnD1Gm6xHRNCYTkRU2/jEulfH38KcIWyp/GAMgvoE=
@@ -500,6 +499,8 @@ golang.org/x/sys v0.0.0-20200223170610-d5e6a3e2c0ae h1:/WDfKMnPU+m5M4xB+6x4kaepx
 golang.org/x/sys v0.0.0-20200223170610-d5e6a3e2c0ae/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20200602225109-6fdc65e7d980 h1:OjiUf46hAmXblsZdnoSXsEUSKU8r1UEzcL5RVZ4gO9Y=
 golang.org/x/sys v0.0.0-20200602225109-6fdc65e7d980/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+golang.org/x/sys v0.0.0-20200610111108-226ff32320da h1:bGb80FudwxpeucJUjPYJXuJ8Hk91vNtfvrymzwiei38=
+golang.org/x/sys v0.0.0-20200610111108-226ff32320da/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
 golang.org/x/text v0.3.2 h1:tW2bmiBqwgJj/UpqtC8EpXEZVYOwU0yG4iWbprSVAcs=
 golang.org/x/text v0.3.2/go.mod h1:bEr9sfX3Q8Zfm5fL9x+3itogRgK3+ptLWKqgva+5dAk=
