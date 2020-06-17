@@ -17,7 +17,7 @@ function App() {
 				avatar: 'https://avatars0.githubusercontent.com/u/24400526?s=200&v=4',
 				url: 'https://pinpoint.com'
 			},
-			uiURL: 'http://localhost:3000'
+			uiURL: window.location.href
 		};
 		return <SimulatorInstaller integration={integration} />;
 	}
