@@ -210,11 +210,11 @@ const getEntityName = (val: string) => {
 	return res;
 };
 
-const fetchUser = (name: string, api_token: string, onAdd: (account: Account) => void) => {
+const fetchUser = (name: string, api_key: string, onAdd: (account: Account) => void) => {
 	const xhr = new XMLHttpRequest();
 	xhr.open('GET', 'https://api.github.com/users/' + getEntityName(name));
 	xhr.setRequestHeader('Content-Type', 'application/json');
-	xhr.setRequestHeader('Authorization', `Bearer ${api_token}`);
+	xhr.setRequestHeader('Authorization', `Bearer ${api_key}`);
 	xhr.responseType = 'json';
 	xhr.onreadystatechange = function() {
 		if (this.readyState === 4) {
@@ -246,11 +246,11 @@ const fetchUser = (name: string, api_token: string, onAdd: (account: Account) =>
 };
 
 
-const fetchOrg = (name: string, api_token: string, onAdd: (account: Account) => void) => {
+const fetchOrg = (name: string, api_key: string, onAdd: (account: Account) => void) => {
 	const xhr = new XMLHttpRequest();
 	xhr.open('GET', 'https://api.github.com/orgs/' + getEntityName(name));
 	xhr.setRequestHeader('Content-Type', 'application/json');
-	xhr.setRequestHeader('Authorization', `Bearer ${api_token}`);
+	xhr.setRequestHeader('Authorization', `Bearer ${api_key}`);
 	xhr.responseType = 'json';
 	xhr.onreadystatechange = function() {
 		if (this.readyState === 4) {
@@ -258,7 +258,7 @@ const fetchOrg = (name: string, api_token: string, onAdd: (account: Account) => 
 			switch (this.status) {
 				case 404: {
 					// org not found, check and see if maybe a user?
-					fetchUser(name, api_token, onAdd);
+					fetchUser(name, api_key, onAdd);
 					break;
 				}
 				case 200: {
@@ -282,7 +282,7 @@ const fetchOrg = (name: string, api_token: string, onAdd: (account: Account) => 
 	xhr.send();
 };
 
-const ShowAccounts = ({api_token, config}: {api_token: string, config: {[key: string]: any}}) => {
+const ShowAccounts = ({api_key, config}: {api_key: string, config: {[key: string]: any}}) => {
 	const { setConfig, setInstallEnabled, installed } = useIntegration();
 	const [accounts, setAccounts] = useState<any[]>([]);
 	const [account, setAccount] = useState<Account>();
@@ -296,11 +296,11 @@ const ShowAccounts = ({api_token, config}: {api_token: string, config: {[key: st
 		setExclusions((config.exclusions || {})[account.login] || '');
 	}, [config, setExclusions, setAccount, setShowAddExclusionModal]);
 	useEffect(() => {
-		if (api_token) {
+		if (api_key) {
 			const xhr = new XMLHttpRequest();
 			xhr.open('POST', 'https://api.github.com/graphql');
 			xhr.setRequestHeader('Content-Type', 'application/json');
-			xhr.setRequestHeader('Authorization', `Bearer ${api_token}`);
+			xhr.setRequestHeader('Authorization', `Bearer ${api_key}`);
 			xhr.responseType = 'json';
 			xhr.onreadystatechange = function() {
 				if (this.readyState === 4 && this.status === 200) {
@@ -323,7 +323,7 @@ const ShowAccounts = ({api_token, config}: {api_token: string, config: {[key: st
 			};
 			xhr.send(JSON.stringify({query: viewerOrgsGQL}));
 		}
-	}, [api_token, config, setAccounts, setInstallEnabled, setConfig, doShowAddExclusionModal, installed]);
+	}, [api_key, config, setAccounts, setInstallEnabled, setConfig, doShowAddExclusionModal, installed]);
 	return (
 		<>
 			<div style={{display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
@@ -361,7 +361,7 @@ const ShowAccounts = ({api_token, config}: {api_token: string, config: {[key: st
 				onSubmit={(val: string) => {
 					// TODO: parse out url
 					setShowAddAccountModal(false);
-					fetchOrg(val, api_token, (account: Account) => {
+					fetchOrg(val, api_key, (account: Account) => {
 						const newaccts = [...accounts, buildAccountRow(account, config, doShowAddExclusionModal)];
 						setAccounts(newaccts);
 						setInstallEnabled(true);
@@ -443,7 +443,7 @@ const Integration = () => {
 				const k = t[0];
 				const v = t[1];
 				if (k === 'token') {
-					config.api_token = v;
+					config.api_key = v;
 					setType('CLOUD');
 					setConfig(config);
 					setRerender(Date.now());
@@ -476,7 +476,7 @@ const Integration = () => {
 		return <SelfManagedForm config={config} />;
 	}
 	return (
-		<ShowAccounts api_token={config.api_token} config={config} />
+		<ShowAccounts api_key={config.api_key} config={config} />
 	);
 };
 
