@@ -2,7 +2,10 @@ module github.com/pinpt/agent.next.github
 
 go 1.14
 
-require github.com/pinpt/agent.next v0.0.0-20200616032051-aa676756d8ab
+require (
+	github.com/pinpt/agent.next v0.0.0-20200621034954-e5deace60727
+	golang.org/x/text v0.3.3 // indirect
+)
 
 // TODO: this is only set while we're in rapid dev. once we get out of that we should remove
 replace github.com/pinpt/agent.next => ../agent.next
