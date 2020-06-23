@@ -118,8 +118,8 @@ const buildAccountRow = (account: Account, config: {[key: string]: any}, onClick
 	return {
 		key: account.login,
 		left: <AccountSelector account={account} config={config} />,
-		center: <span style={{flex: '1 1 100%', color: Theme.Royal300}}>{account.description}</span>,
-		right: <span style={{flex: '0 0 auto', color: Theme.Mono500}}>{new Intl.NumberFormat().format(account.repositories.totalCount)} repos <Button onClick={() => onClick(account)} style={{marginLeft: '1rem', padding: '1px 5px'}}>+ Exclusions</Button></span>,
+		center: <span style={{marginLeft: '1rem', color: Theme.Royal300}}>{account.description}</span>,
+		right: <span style={{color: Theme.Mono500}}>{new Intl.NumberFormat().format(account.repositories.totalCount)} repos <Button onClick={() => onClick(account)} style={{marginLeft: '1rem', padding: '1px 5px'}}>+ Exclusions</Button></span>,
 	};
 };
 
