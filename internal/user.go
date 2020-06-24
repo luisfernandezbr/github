@@ -63,7 +63,7 @@ func (u *UserManager) isMemberOfOrg(orgName string) bool {
 	return false
 }
 
-func (u *UserManager) emitAuthor(author author) error {
+func (u *UserManager) emitAuthor(logger sdk.Logger, author author) error {
 	refID := author.RefID(u.customerID)
 	if refID == "" {
 		return nil
@@ -79,18 +79,18 @@ func (u *UserManager) emitAuthor(author author) error {
 		for {
 			// go to GitHub and find out if this user is a current member of our organization
 			var result userOrgResult
-			sdk.LogDebug(u.integration.logger, "need to fetch user org details", "ref_id", refID)
+			sdk.LogDebug(logger, "need to fetch user org details", "ref_id", refID)
 			if err := u.integration.client.Query(getUserOrgsQuery, map[string]interface{}{"id": author.ID}, &result); err != nil {
 				u.mu.Unlock()
-				if u.integration.checkForAbuseDetection(u.export, err) {
+				if u.integration.checkForAbuseDetection(logger, u.export, err) {
 					u.mu.Lock()
 					continue
 				}
-				if u.integration.checkForRetryableError(u.export, err) {
+				if u.integration.checkForRetryableError(logger, u.export, err) {
 					u.mu.Lock()
 					continue
 				}
-				sdk.LogError(u.integration.logger, "error fetching user", "err", err, "ref_id", refID)
+				sdk.LogError(logger, "error fetching user", "err", err, "ref_id", refID)
 				return err
 			}
 			var ismember bool
@@ -101,7 +101,7 @@ func (u *UserManager) emitAuthor(author author) error {
 				}
 			}
 			user.Member = ismember
-			if err := u.integration.checkForRateLimit(u.export, result.RateLimit); err != nil {
+			if err := u.integration.checkForRateLimit(logger, u.export, result.RateLimit); err != nil {
 				u.mu.Unlock()
 				return err
 			}
@@ -113,7 +113,7 @@ func (u *UserManager) emitAuthor(author author) error {
 	return u.pipe.Write(user)
 }
 
-func (u *UserManager) emitGitUser(author gitUser) error {
+func (u *UserManager) emitGitUser(logger sdk.Logger, author gitUser) error {
 	refID := author.RefID(u.customerID)
 	if refID == "" {
 		return nil
@@ -129,18 +129,18 @@ func (u *UserManager) emitGitUser(author gitUser) error {
 		for {
 			// go to GitHub and find out if this user is a current member of our organization
 			var result userOrgResult
-			sdk.LogDebug(u.integration.logger, "need to fetch user org details", "ref_id", refID)
+			sdk.LogDebug(logger, "need to fetch user org details", "ref_id", refID)
 			if err := u.integration.client.Query(getUserOrgsQuery, map[string]interface{}{"id": author.User.ID}, &result); err != nil {
 				u.mu.Unlock()
-				if u.integration.checkForAbuseDetection(u.export, err) {
+				if u.integration.checkForAbuseDetection(logger, u.export, err) {
 					u.mu.Lock()
 					continue
 				}
-				if u.integration.checkForRetryableError(u.export, err) {
+				if u.integration.checkForRetryableError(logger, u.export, err) {
 					u.mu.Lock()
 					continue
 				}
-				sdk.LogError(u.integration.logger, "error fetching user", "err", err, "ref_id", refID)
+				sdk.LogError(logger, "error fetching user", "err", err, "ref_id", refID)
 				return err
 			}
 			var ismember bool
@@ -151,7 +151,7 @@ func (u *UserManager) emitGitUser(author gitUser) error {
 				}
 			}
 			user.Member = ismember
-			if err := u.integration.checkForRateLimit(u.export, result.RateLimit); err != nil {
+			if err := u.integration.checkForRateLimit(logger, u.export, result.RateLimit); err != nil {
 				u.mu.Unlock()
 				return err
 			}

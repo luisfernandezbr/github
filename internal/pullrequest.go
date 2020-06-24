@@ -51,7 +51,7 @@ func setPullRequestCommits(pullrequest *sdk.SourceCodePullRequest, commits []*sd
 	}
 }
 
-func (pr pullrequest) ToModel(userManager *UserManager, customerID string, repoName string, repoID string) *sdk.SourceCodePullRequest {
+func (pr pullrequest) ToModel(logger sdk.Logger, userManager *UserManager, customerID string, repoName string, repoID string) *sdk.SourceCodePullRequest {
 	// FIXME: implement the remaining fields
 	pullrequest := &sdk.SourceCodePullRequest{}
 	pullrequest.ID = sdk.NewSourceCodePullRequestID(customerID, pr.ID, refType, repoID)
@@ -64,7 +64,7 @@ func (pr pullrequest) ToModel(userManager *UserManager, customerID string, repoN
 	pullrequest.Description = pr.Body
 	pullrequest.Draft = pr.Draft
 	pullrequest.CreatedByRefID = pr.Author.RefID(customerID)
-	userManager.emitAuthor(pr.Author)
+	userManager.emitAuthor(logger, pr.Author)
 	pullrequest.BranchName = pr.Branch
 	pullrequest.Identifier = fmt.Sprintf("%s#%d", repoName, pr.Number)
 	if pr.Merged {
@@ -77,7 +77,7 @@ func (pr pullrequest) ToModel(userManager *UserManager, customerID string, repoN
 			Offset:  md.Offset,
 		}
 		pullrequest.MergedByRefID = pr.MergedBy.RefID(customerID)
-		userManager.emitAuthor(pr.MergedBy)
+		userManager.emitAuthor(logger, pr.MergedBy)
 	}
 	cd, _ := sdk.NewDateWithTime(pr.CreatedAt)
 	pullrequest.CreatedDate = sdk.SourceCodePullRequestCreatedDate{
