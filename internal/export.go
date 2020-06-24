@@ -289,6 +289,16 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 			}
 			retryCount = 0
 			for _, edge := range result.Organization.Repositories.Edges {
+				if config.Exclusions != nil && config.Exclusions.Matches(login, edge.Node.Name) {
+					// skip any repos that don't match our rule
+					sdk.LogInfo(g.logger, "skipping repo because it matched exclusion rule", "name", edge.Node.Name)
+					continue
+				}
+				if config.Inclusions != nil && !config.Inclusions.Matches(login, edge.Node.Name) {
+					// skip any repos that don't match our rule
+					sdk.LogInfo(g.logger, "skipping repo because it didn't match inclusion rule", "name", edge.Node.Name)
+					continue
+				}
 				repoCount++
 				repo := edge.Node.ToModel(customerID)
 				if err := pipe.Write(repo); err != nil {
@@ -296,6 +306,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 				}
 				if edge.Node.IsArchived {
 					// skip archived for now (but still send the repo)
+					sdk.LogInfo(g.logger, "skipping repo because it was archived", "name", edge.Node.Name)
 					continue
 				}
 				for _, predge := range edge.Node.Pullrequests.Edges {
