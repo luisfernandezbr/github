@@ -6,17 +6,6 @@ import (
 	"github.com/pinpt/agent.next/sdk"
 )
 
-type repositoryNode struct {
-	Cursor string
-	Node   repository
-}
-
-type repositories struct {
-	TotalCount int
-	PageInfo   pageInfo
-	Edges      []repositoryNode
-}
-
 type repository struct {
 	ID            string       `json:"id"`
 	Name          string       `json:"nameWithOwner"`

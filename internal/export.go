@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"strings"
@@ -200,6 +201,130 @@ func (g *GithubIntegration) queuePullRequestJob(logger sdk.Logger, userManager *
 	}
 }
 
+func (g *GithubIntegration) fetchAllRepos(logger sdk.Logger, export sdk.Export, login string, scope string) ([]repoName, error) {
+	repos := make([]repoName, 0)
+	var variables = map[string]interface{}{
+		"first": defaultPageSize,
+		"login": login,
+	}
+	var after string
+	var retryCount int
+	for {
+		if after != "" {
+			variables["after"] = after
+		}
+		sdk.LogDebug(logger, "running fetch all repos", "login", login, "after", after, "limit", variables["first"], "retryCount", retryCount)
+		var result repoWithNameResult
+		if err := g.client.Query(generateAllReposQuery(after, scope), variables, &result); err != nil {
+			if g.checkForAbuseDetection(logger, export, err) {
+				continue
+			}
+			if g.checkForRetryableError(logger, export, err) {
+				retryCount++
+				variables["first"] = defaultRetryPageSize // back off the page size to see if this will help
+				if retryCount >= 10 {
+					return nil, fmt.Errorf("failed to fetch repos after retrying 10 times for %s (%s)", login, scope)
+				}
+				continue
+			}
+			return nil, err
+		}
+		retryCount = 0
+		for _, repo := range result.Data.Repositories.Nodes {
+			repos = append(repos, repo)
+		}
+		if err := g.checkForRateLimit(logger, export, result.RateLimit); err != nil {
+			return nil, err
+		}
+		if !result.Data.Repositories.PageInfo.HasNextPage {
+			break
+		}
+		after = result.Data.Repositories.PageInfo.EndCursor
+	}
+	return repos, nil
+}
+
+func (g *GithubIntegration) fetchViewer(logger sdk.Logger, export sdk.Export) (string, error) {
+	var retryCount int
+	for {
+		sdk.LogDebug(logger, "running viewer query", "retryCount", retryCount)
+		var result viewerResult
+		if err := g.client.Query(generateViewerLogin(), nil, &result); err != nil {
+			if g.checkForAbuseDetection(logger, export, err) {
+				continue
+			}
+			if g.checkForRetryableError(logger, export, err) {
+				retryCount++
+				continue
+			}
+			return "", err
+		}
+		retryCount = 0
+		return result.Viewer.Login, nil
+	}
+}
+
+func (g *GithubIntegration) getRepoKey(name string) string {
+	return fmt.Sprintf("repo_cursor_%s", name)
+}
+
+func (g *GithubIntegration) fetchRepos(logger sdk.Logger, export sdk.Export, repos []string) ([]repository, error) {
+	results := make([]repository, 0)
+	var retryCount int
+	var offset int
+	const max = 10
+	state := export.State()
+	for offset < len(repos) {
+		sdk.LogDebug(logger, "running repo query", "retryCount", retryCount, "offset", offset, "length", len(repos))
+		result := make(map[string]json.RawMessage)
+		var sb strings.Builder
+		end := offset + max
+		if end > len(repos) {
+			end = len(repos)
+		}
+		// concat multiple parallel queries for each repo
+		for i, repo := range repos[offset:end] {
+			tok := strings.Split(repo, "/")
+			owner := tok[0]
+			name := tok[1]
+			label := fmt.Sprintf("repo%d", i)
+			var cursor string
+			state.Get(g.getRepoKey(repo), &cursor)
+			sb.WriteString(getAllRepoDataQuery(owner, name, label, cursor))
+		}
+		if err := g.client.Query("query { "+sb.String()+" rateLimit { limit cost remaining resetAt } }", nil, &result); err != nil {
+			if g.checkForAbuseDetection(logger, export, err) {
+				continue
+			}
+			if g.checkForRetryableError(logger, export, err) {
+				retryCount++
+				continue
+			}
+			return nil, err
+		}
+		for key, buf := range result {
+			if key == "rateLimit" {
+				var rl rateLimit
+				if err := json.Unmarshal(buf, &rl); err != nil {
+					return nil, err
+				}
+				if err := g.checkForRateLimit(logger, export, rl); err != nil {
+					return nil, err
+				}
+			} else {
+				var repo repository
+				if err := json.Unmarshal(buf, &repo); err != nil {
+					return nil, err
+				}
+				results = append(results, repo)
+			}
+		}
+		retryCount = 0
+		offset += len(repos)
+	}
+	return results, nil
+}
+
 // Export is called to tell the integration to run an export
 func (g *GithubIntegration) Export(export sdk.Export) error {
 	logger := sdk.LogWith(g.logger, "customer_id", export.CustomerID(), "job_id", export.JobID())
@@ -231,10 +356,10 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 		sdk.LogInfo(logger, "no accounts configured, will do all member orgs")
 	}
 
-	// TODO: we need to add support for personal accounts, right now we're skipping them
 	// TODO: add skip public repos since we're going to have a specific customer_id (empty) to do those in the future
 
 	var orgs []string
+	var users []string
 	if accounts == nil {
 		// first we're going to fetch all the organizations that the viewer is a member of if accounts if nil
 		var allorgs allOrgsResult
@@ -254,160 +379,154 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 			}
 			break
 		}
+		viewer, err := g.fetchViewer(logger, export)
+		if err != nil {
+			return err
+		}
+		users = append(users, viewer)
 	} else {
 		for _, acct := range *accounts {
 			if acct.Type == orgAccountType {
 				orgs = append(orgs, acct.Login)
+			} else {
+				users = append(users, acct.Login)
 			}
 		}
 	}
-	sdk.LogDebug(logger, "exporting the following organizations", "orgs", orgs)
-	var variables = map[string]interface{}{
-		"first": 10,
+
+	includeRepo := func(login string, name string, isArchived bool) bool {
+		if config.Exclusions != nil && config.Exclusions.Matches(login, name) {
+			// skip any repos that don't match our rule
+			sdk.LogInfo(logger, "skipping repo because it matched exclusion rule", "name", name)
+			return false
+		}
+		if config.Inclusions != nil && !config.Inclusions.Matches(login, name) {
+			// skip any repos that don't match our rule
+			sdk.LogInfo(logger, "skipping repo because it didn't match inclusion rule", "name", name)
+			return false
+		}
+		return isArchived == false
 	}
-	state := export.State()
+
+	sdk.LogDebug(logger, "exporting the following accounts", "orgs", orgs, "users", users)
+
+	repos := make([]repoName, 0)
+	reponames := make([]string, 0)
+
+	// add all the user repos
+	for _, login := range users {
+		userrepos, err := g.fetchAllRepos(logger, export, login, "user")
+		if err != nil {
+			return err
+		}
+		// TODO: check and see if the repo is no longer in the previous fetch session
+		for _, repo := range userrepos {
+			if includeRepo(login, repo.Name, repo.IsArchived) {
+				repo.Scope = userAccountType
+				repos = append(repos, repo)
+				reponames = append(reponames, repo.Name)
+			}
+		}
+	}
+
+	// add all the org repos
+	for _, login := range orgs {
+		orgrepos, err := g.fetchAllRepos(logger, export, login, "organization")
+		if err != nil {
+			return err
+		}
+		// TODO: check and see if the repo is no longer in the previous fetch session
+		for _, repo := range orgrepos {
+			if includeRepo(login, repo.Name, repo.IsArchived) {
+				repo.Scope = orgAccountType
+				repos = append(repos, repo)
+				reponames = append(reponames, repo.Name)
+			}
+		}
+	}
+
+	// fetch the repo data to include all the related entities like pull requests etc
+	therepos, err := g.fetchRepos(logger, export, reponames)
+	if err != nil {
+		return err
+	}
+
 	customerID := export.CustomerID()
 	userManager := NewUserManager(customerID, orgs, export, pipe, g)
 	jobs := make([]job, 0)
 	started := time.Now()
-	makeCursorKey := func(object string) string {
-		return "cursor:" + object
-	}
-	// TODO: need to handle storing each object in state and then comparing on an incremental
-	// for comments, commits, etc.
+	state := export.State()
 	var repoCount, prCount, reviewCount, commitCount, commentCount int
-	var before, after string
-	for _, login := range orgs {
-		variables["login"] = login
-		loginCursorKey := makeCursorKey("org_" + login)
-		if _, err := state.Get(loginCursorKey, &before); err != nil {
+
+	for _, node := range therepos {
+		sdk.LogInfo(logger, "processing repo: "+node.Name, "id", node.ID)
+		repoCount++
+		repo := node.ToModel(customerID)
+		if err := pipe.Write(repo); err != nil {
 			return err
 		}
-		var firstCursor string
-		var page, retryCount int
-		for {
-			if before != "" {
-				variables["before"] = before
-				delete(variables, "after")
-			}
-			if after != "" {
-				variables["after"] = after
-				delete(variables, "before")
-			}
-			sdk.LogDebug(logger, "running export", "org", login, "before", before, "after", after, "page", page, "retryCount", retryCount, "variables", variables)
-			var result allQueryResult
-			if err := g.client.Query(generateAllDataQuery(before, after), variables, &result); err != nil {
-				if g.checkForAbuseDetection(logger, export, err) {
-					continue
-				}
-				if g.checkForRetryableError(logger, export, err) {
-					retryCount++
-					variables["first"] = 1 // back off the page size to see if this will help
-					if retryCount >= 10 {
-						return fmt.Errorf("failed to export after retrying 10 times for %s", login)
-					}
-					continue
-				}
-				return err
-			}
-			if page == 0 {
-				firstCursor = result.Organization.Repositories.PageInfo.StartCursor
-			}
-			retryCount = 0
-			for _, edge := range result.Organization.Repositories.Edges {
-				if config.Exclusions != nil && config.Exclusions.Matches(login, edge.Node.Name) {
-					// skip any repos that don't match our rule
-					sdk.LogInfo(logger, "skipping repo because it matched exclusion rule", "name", edge.Node.Name)
-					continue
-				}
-				if config.Inclusions != nil && !config.Inclusions.Matches(login, edge.Node.Name) {
-					// skip any repos that don't match our rule
-					sdk.LogInfo(logger, "skipping repo because it didn't match inclusion rule", "name", edge.Node.Name)
-					continue
-				}
-				repoCount++
-				repo := edge.Node.ToModel(customerID)
-				if err := pipe.Write(repo); err != nil {
+		for _, predge := range node.Pullrequests.Edges {
+			pullrequest := predge.Node.ToModel(logger, userManager, customerID, repo.Name, repo.ID)
+			for _, reviewedge := range predge.Node.Reviews.Edges {
+				prreview := reviewedge.Node.ToModel(logger, userManager, customerID, repo.ID, pullrequest.ID)
+				if err := pipe.Write(prreview); err != nil {
 					return err
 				}
-				if edge.Node.IsArchived {
-					// skip archived for now (but still send the repo)
-					sdk.LogInfo(logger, "skipping repo because it was archived", "name", edge.Node.Name)
-					continue
-				}
-				for _, predge := range edge.Node.Pullrequests.Edges {
-					pullrequest := predge.Node.ToModel(logger, userManager, customerID, edge.Node.Name, repo.ID)
-					for _, reviewedge := range predge.Node.Reviews.Edges {
-						prreview := reviewedge.Node.ToModel(logger, userManager, customerID, repo.ID, pullrequest.ID)
-						if err := pipe.Write(prreview); err != nil {
-							return err
-						}
-						reviewCount++
-					}
-					if predge.Node.Reviews.PageInfo.HasNextPage {
-						// TODO: queue
-					}
-					for _, commentedge := range predge.Node.Comments.Edges {
-						prcomment := commentedge.Node.ToModel(logger, userManager, customerID, repo.ID, pullrequest.ID)
-						if err := pipe.Write(prcomment); err != nil {
-							return err
-						}
-						commentCount++
-					}
-					if predge.Node.Comments.PageInfo.HasNextPage {
-						// TODO: queue
-					}
-					commits := make([]*sdk.SourceCodePullRequestCommit, 0)
-					for _, commitedge := range predge.Node.Commits.Edges {
-						prcommit := commitedge.Node.Commit.ToModel(logger, userManager, customerID, repo.ID, pullrequest.ID)
-						commits = append(commits, prcommit)
-					}
-					if predge.Node.Commits.PageInfo.HasNextPage {
-						// fetch all the remaining paged commits
-						morecommits, err := g.fetchPullRequestCommits(logger, userManager, export, repo.Name, predge.Node.ID, pullrequest.RepoID, predge.Node.Commits.PageInfo.EndCursor)
-						if err != nil {
-							return err
-						}
-						commits = append(commits, morecommits...)
-						sdk.LogDebug(logger, "fetched pull request commits", "count", len(commits), "pullrequest_id", predge.Node.ID, "repo", repo.Name)
-					}
-					// set the commits back on the pull request
-					setPullRequestCommits(pullrequest, commits)
-					// stream out all our commits
-					for _, commit := range commits {
-						if err := pipe.Write(commit); err != nil {
-							return err
-						}
-						commitCount++
-					}
-					// stream out our pullrequest
-					if err := pipe.Write(pullrequest); err != nil {
-						return err
-					}
-					prCount++
-				}
-				if edge.Node.Pullrequests.PageInfo.HasNextPage {
-					tok := strings.Split(edge.Node.Name, "/")
-					// queue the pull requests for the next page
-					jobs = append(jobs, g.queuePullRequestJob(logger, userManager, tok[0], tok[1], repo.GetID(), edge.Node.Pullrequests.PageInfo.EndCursor))
-				}
+				reviewCount++
 			}
-			// check to see if we are at the end of our pagination
-			if !result.Organization.Repositories.PageInfo.HasNextPage {
-				break
+			if predge.Node.Reviews.PageInfo.HasNextPage {
+				// TODO: queue
 			}
-			if err := g.checkForRateLimit(logger, export, result.RateLimit); err != nil {
-				pipe.Close()
+			for _, commentedge := range predge.Node.Comments.Edges {
+				prcomment := commentedge.Node.ToModel(logger, userManager, customerID, repo.ID, pullrequest.ID)
+				if err := pipe.Write(prcomment); err != nil {
+					return err
+				}
+				commentCount++
+			}
+			if predge.Node.Comments.PageInfo.HasNextPage {
+				// TODO: queue
+			}
+			commits := make([]*sdk.SourceCodePullRequestCommit, 0)
+			for _, commitedge := range predge.Node.Commits.Edges {
+				prcommit := commitedge.Node.Commit.ToModel(logger, userManager, customerID, repo.ID, pullrequest.ID)
+				commits = append(commits, prcommit)
+			}
+			if predge.Node.Commits.PageInfo.HasNextPage {
+				// fetch all the remaining paged commits
+				morecommits, err := g.fetchPullRequestCommits(logger, userManager, export, repo.Name, predge.Node.ID, pullrequest.RepoID, predge.Node.Commits.PageInfo.EndCursor)
+				if err != nil {
+					return err
+				}
+				commits = append(commits, morecommits...)
+				sdk.LogDebug(logger, "fetched pull request commits", "count", len(commits), "pullrequest_id", predge.Node.ID, "repo", repo.Name)
+			}
+			// set the commits back on the pull request
+			setPullRequestCommits(pullrequest, commits)
+			// stream out all our commits
+			for _, commit := range commits {
+				if err := pipe.Write(commit); err != nil {
+					return err
+				}
+				commitCount++
+			}
+			// stream out our pullrequest
+			if err := pipe.Write(pullrequest); err != nil {
 				return err
 			}
-			after = result.Organization.Repositories.PageInfo.EndCursor
-			before = ""
-			page++
+			prCount++
 		}
-		// set the first cursor so we can do a before on the next incremental
-		sdk.LogDebug(logger, "setting the organization cursor", "org", login, "cursor", firstCursor)
-		state.Set(loginCursorKey, firstCursor)
+		// save off where we started at so we can page from there in subsequent exports
+		if err := state.Set(g.getRepoKey(repo.Name), node.Pullrequests.PageInfo.StartCursor); err != nil {
+			return fmt.Errorf("error saving repo state: %w", err)
+		}
+		if node.Pullrequests.PageInfo.HasNextPage {
+			tok := strings.Split(node.Name, "/")
+			// queue the pull requests for the next page
+			jobs = append(jobs, g.queuePullRequestJob(logger, userManager, tok[0], tok[1], repo.GetID(), node.Pullrequests.PageInfo.EndCursor))
+		}
 	}
+
 	sdk.LogInfo(logger, "initial export completed", "duration", time.Since(started), "repoCount", repoCount, "prCount", prCount, "reviewCount", reviewCount, "commitCount", commitCount, "commentCount", commentCount)
 
 	_, skipHistorical := g.config.GetBool("skip-historical")

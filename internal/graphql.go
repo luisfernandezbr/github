@@ -33,15 +33,6 @@ type oidProp struct {
 	Oid string `json:"oid"`
 }
 
-type organization struct {
-	Repositories repositories `json:"repositories"`
-}
-
-type allQueryResult struct {
-	Organization organization `json:"organization"`
-	RateLimit    rateLimit    `json:"rateLimit"`
-}
-
 var pullrequestPagedQuery = `
 query GetPullRequests($name: String!, $owner: String!, $first: Int!, $after: String) {
 	repository(name: $name, owner: $owner) {
@@ -302,190 +293,60 @@ query GetAllOrgs($first: Int!) {
 }
 `
 
-func generateAllDataQuery(before string, after string) string {
+type viewerResult struct {
+	Viewer struct {
+		Login string `json:"login"`
+	} `json:"viewer"`
+}
+
+func generateViewerLogin() string {
+	return `query viewer {
+		viewer {
+		  login
+		}
+	 }`
+}
+
+type repoName struct {
+	ID         string `json:"id"`
+	Name       string `json:"nameWithOwner"`
+	IsPrivate  bool   `json:"isPrivate"`
+	IsArchived bool   `json:"isArchived"`
+	Scope      accountType
+}
+
+type repoWithNameResult struct {
+	Data struct {
+		Repositories struct {
+			TotalCount int        `json:"totalCount"`
+			PageInfo   pageInfo   `json:"pageInfo"`
+			Nodes      []repoName `json:"nodes"`
+		} `json:"repositories"`
+	} `json:"data"`
+	RateLimit rateLimit `json:"rateLimit"`
+}
+
+func generateAllReposQuery(after string, scope string) string {
 	var definitionLine, argLine string
-	if before != "" {
-		definitionLine = ", $before: String! "
-		argLine = " before: $before "
-	}
 	if after != "" {
 		definitionLine = ", $after: String! "
 		argLine = " after: $after "
 	}
 	return fmt.Sprintf(`
-	query GetAllData($login: String!, $first: Int! %s) {
-		organization(login: $login) {
-			repositories(first: $first %s isFork: false orderBy: {field: UPDATED_AT, direction: DESC}) {
+	query GetAllRepos($login: String!, $first: Int! %[1]s) {
+		data: %[3]s(login: $login) {
+			repositories(first: $first %[2]s isFork: false affiliations: [OWNER, ORGANIZATION_MEMBER] orderBy: {field: PUSHED_AT, direction: DESC}) {
 				totalCount
 				pageInfo {
 					hasNextPage
 					startCursor
 					endCursor
 				}
-				edges {
-					cursor
-					node {
-						id
-						nameWithOwner
-						url
-						updatedAt
-						description
-						defaultBranchRef {
-							name
-						}
-						primaryLanguage {
-							name
-						}
-						isArchived
-						pullRequests(first: 10, orderBy: {field: UPDATED_AT, direction: DESC}) {
-							totalCount
-							pageInfo {
-								hasNextPage
-								startCursor
-								endCursor
-							}
-							edges {
-								cursor
-								node {
-									id
-									bodyHTML
-									url
-									closed
-									draft: isDraft
-									locked
-									merged
-									number
-									state
-									title
-									createdAt
-									updatedAt
-									mergedAt
-									branch: headRefName
-									mergeCommit {
-										oid
-									}
-									mergedBy {
-										type: __typename
-										avatarUrl
-										login
-										url
-										...on User {
-											id
-											email
-											name
-										}
-									}
-									author {
-										type: __typename
-										avatarUrl
-										login
-										url
-										...on User {
-											id
-											email
-											name
-										}
-									}
-									commits(first: 10) {
-										totalCount
-										pageInfo {
-											hasNextPage
-											startCursor
-											endCursor
-										}
-										edges {
-											cursor
-											node {
-												commit {
-													sha: oid
-													message
-													authoredDate
-													additions
-													deletions
-													url
-													author {
-														avatarUrl
-														email
-														name
-														user {
-															id
-															login
-														}
-													}
-													committer {
-														avatarUrl
-														email
-														name
-														user {
-															id
-															login
-														}
-													}
-												}
-											}
-										}
-									}
-									reviews(first: 10) {
-										totalCount
-										pageInfo {
-											hasNextPage
-											startCursor
-											endCursor
-										}
-										edges {
-											cursor
-											node {
-												id
-												state
-												createdAt
-												url
-												author {
-													type: __typename
-													avatarUrl
-													login
-													url
-													...on User {
-														id
-														email
-														name
-													}
-												}
-											}
-										}
-									}
-									comments(first: 10) {
-										totalCount
-										pageInfo {
-											hasNextPage
-											startCursor
-											endCursor
-										}
-										edges {
-											cursor
-											node {
-												id
-												createdAt
-												updatedAt
-												url
-												bodyHTML
-												author {
-													type: __typename
-													avatarUrl
-													login
-													url
-													...on User {
-														id
-														email
-														name
-													}
-												}
-											}
-										}
-									}
-								}
-							}
-						}
-					}
+				nodes {
+					id
+					nameWithOwner
+					isPrivate
+					isArchived
 				}
 			}
 		}
@@ -495,6 +356,175 @@ func generateAllDataQuery(before string, after string) string {
 			remaining
 			resetAt
 		}
+	}`, definitionLine, argLine, scope)
+}
+
+func getAllRepoDataQuery(owner, name, label, cursor string) string {
+	var cursorVal string
+	if cursor != "" {
+		cursorVal = fmt.Sprintf(`, after: "%s"`, cursor)
 	}
-	`, definitionLine, argLine)
+	return fmt.Sprintf(`
+%s: repository(name: "%s", owner: "%s") {
+		id
+		nameWithOwner
+		url
+		updatedAt
+		description
+		defaultBranchRef {
+			name
+		}
+		primaryLanguage {
+			name
+		}
+		isArchived
+		pullRequests(first: 10, orderBy: {field: UPDATED_AT, direction: DESC} %s) {
+			totalCount
+			pageInfo {
+				hasNextPage
+				startCursor
+				endCursor
+			}
+			edges {
+				cursor
+				node {
+					id
+					bodyHTML
+					url
+					closed
+					draft: isDraft
+					locked
+					merged
+					number
+					state
+					title
+					createdAt
+					updatedAt
+					mergedAt
+					branch: headRefName
+					mergeCommit {
+						oid
+					}
+					mergedBy {
+						type: __typename
+						avatarUrl
+						login
+						url
+						... on User {
+							id
+							email
+							name
+						}
+					}
+					author {
+						type: __typename
+						avatarUrl
+						login
+						url
+						... on User {
+							id
+							email
+							name
+						}
+					}
+					commits(first: 10) {
+						totalCount
+						pageInfo {
+							hasNextPage
+							startCursor
+							endCursor
+						}
+						edges {
+							cursor
+							node {
+								commit {
+									sha: oid
+									message
+									authoredDate
+									additions
+									deletions
+									url
+									author {
+										avatarUrl
+										email
+										name
+										user {
+											id
+											login
+										}
+									}
+									committer {
+										avatarUrl
+										email
+										name
+										user {
+											id
+											login
+										}
+									}
+								}
+							}
+						}
+					}
+					reviews(first: 10) {
+						totalCount
+						pageInfo {
+							hasNextPage
+							startCursor
+							endCursor
+						}
+						edges {
+						cursor
+							node {
+								id
+								state
+								createdAt
+								url
+								author {
+									type: __typename
+									avatarUrl
+									login
+									url
+									... on User {
+										id
+										email
+										name
+									}
+								}
+							}
+						}
+					}
+					comments(first: 10) {
+						totalCount
+						pageInfo {
+							hasNextPage
+							startCursor
+							endCursor
+						}
+						edges {
+							cursor
+							node {
+								id
+								createdAt
+								updatedAt
+								url
+								bodyHTML
+								author {
+									type: __typename
+									avatarUrl
+									login
+									url
+									... on User {
+										id
+										email
+										name
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}`, label, name, owner, cursorVal)
 }
