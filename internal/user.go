@@ -124,7 +124,7 @@ func (u *UserManager) emitGitUser(logger sdk.Logger, author gitUser) error {
 		u.mu.Unlock()
 		return nil
 	}
-	user := author.ToModel(u.customerID)
+	user := author.ToModel(u.customerID, u.export.IntegrationID())
 	if user.Type == sdk.SourceCodeUserTypeHuman && author.User.ID != "" {
 		for {
 			// go to GitHub and find out if this user is a current member of our organization

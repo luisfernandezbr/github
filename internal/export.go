@@ -289,8 +289,10 @@ func (g *GithubIntegration) fetchRepos(logger sdk.Logger, export sdk.Export, rep
 			name := tok[1]
 			label := fmt.Sprintf("repo%d", i)
 			var cursor string
-			state.Get(g.getRepoKey(repo), &cursor)
-			sb.WriteString(getAllRepoDataQuery(owner, name, label, cursor))
+			if !export.Historical() {
+				state.Get(g.getRepoKey(repo), &cursor)
+				sb.WriteString(getAllRepoDataQuery(owner, name, label, cursor))
+			}
 		}
 		if err := g.client.Query("query { "+sb.String()+" rateLimit { limit cost remaining resetAt } }", nil, &result); err != nil {
 			if g.checkForAbuseDetection(logger, export, err) {
@@ -410,7 +412,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 
 	sdk.LogDebug(logger, "exporting the following accounts", "orgs", orgs, "users", users)
 
-	repos := make([]repoName, 0)
+	repos := make(map[string]repoName, 0)
 	reponames := make([]string, 0)
 
 	// add all the user repos
@@ -423,7 +425,8 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 		for _, repo := range userrepos {
 			if includeRepo(login, repo.Name, repo.IsArchived) {
 				repo.Scope = userAccountType
-				repos = append(repos, repo)
+				repo.Login = login
+				repos[repo.Name] = repo
 				reponames = append(reponames, repo.Name)
 			}
 		}
@@ -439,7 +442,8 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 		for _, repo := range orgrepos {
 			if includeRepo(login, repo.Name, repo.IsArchived) {
 				repo.Scope = orgAccountType
-				repos = append(repos, repo)
+				repo.Login = login
+				repos[repo.Name] = repo
 				reponames = append(reponames, repo.Name)
 			}
 		}
@@ -452,6 +456,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 	}
 
 	customerID := export.CustomerID()
+	integrationID := export.IntegrationID()
 	userManager := NewUserManager(customerID, orgs, export, pipe, g)
 	jobs := make([]job, 0)
 	started := time.Now()
@@ -461,7 +466,8 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 	for _, node := range therepos {
 		sdk.LogInfo(logger, "processing repo: "+node.Name, "id", node.ID)
 		repoCount++
-		repo := node.ToModel(customerID)
+		r := repos[node.Name]
+		repo := node.ToModel(customerID, integrationID, r.Login, r.IsPrivate, r.Scope)
 		if err := pipe.Write(repo); err != nil {
 			return err
 		}

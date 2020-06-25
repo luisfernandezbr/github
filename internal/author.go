@@ -83,7 +83,7 @@ func (a gitUser) RefID(customerID string) string {
 	return ""
 }
 
-func (a gitUser) ToModel(customerID string) *sdk.SourceCodeUser {
+func (a gitUser) ToModel(customerID string, integrationID string) *sdk.SourceCodeUser {
 	user := &sdk.SourceCodeUser{}
 	user.CustomerID = customerID
 	user.RefID = a.RefID(customerID)
@@ -94,6 +94,7 @@ func (a gitUser) ToModel(customerID string) *sdk.SourceCodeUser {
 			user.AssociatedRefID = sdk.StringPointer(id)
 		}
 	}
+	user.IntegrationInstanceID = sdk.StringPointer(integrationID)
 	user.URL = sdk.StringPointer(a.User.URL)
 	user.AvatarURL = sdk.StringPointer(a.Avatar)
 	user.Email = sdk.StringPointer(a.Email)

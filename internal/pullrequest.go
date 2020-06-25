@@ -66,6 +66,7 @@ func (pr pullrequest) ToModel(logger sdk.Logger, userManager *UserManager, custo
 	pullrequest.CreatedByRefID = pr.Author.RefID(customerID)
 	userManager.emitAuthor(logger, pr.Author)
 	pullrequest.BranchName = pr.Branch
+	pullrequest.IntegrationInstanceID = sdk.StringPointer(userManager.export.IntegrationID())
 	pullrequest.Identifier = fmt.Sprintf("%s#%d", repoName, pr.Number)
 	if pr.Merged {
 		pullrequest.MergeSha = pr.MergeCommit.Oid
