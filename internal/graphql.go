@@ -313,6 +313,7 @@ type repoName struct {
 	IsPrivate  bool   `json:"isPrivate"`
 	IsArchived bool   `json:"isArchived"`
 	Scope      accountType
+	Login      string
 }
 
 type repoWithNameResult struct {
@@ -335,7 +336,7 @@ func generateAllReposQuery(after string, scope string) string {
 	return fmt.Sprintf(`
 	query GetAllRepos($login: String!, $first: Int! %[1]s) {
 		data: %[3]s(login: $login) {
-			repositories(first: $first %[2]s isFork: false affiliations: [OWNER, ORGANIZATION_MEMBER] orderBy: {field: PUSHED_AT, direction: DESC}) {
+			repositories(first: $first %[2]s orderBy: {field: PUSHED_AT, direction: DESC}) {
 				totalCount
 				pageInfo {
 					hasNextPage
@@ -378,6 +379,10 @@ func getAllRepoDataQuery(owner, name, label, cursor string) string {
 			name
 		}
 		isArchived
+		isFork
+		owner {
+			login
+		}
 		pullRequests(first: 10, orderBy: {field: UPDATED_AT, direction: DESC} %s) {
 			totalCount
 			pageInfo {
