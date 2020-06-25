@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { useIntegration } from '@pinpt/agent.websdk';
-import { Button, Dialog, ListPanel, Theme } from '@pinpt/uic.next';
+import { Button, Dialog, Icon, ListPanel, Theme } from '@pinpt/uic.next';
 
 const AuthorizationRequired = () => {
 	const { setRedirectTo, getRedirectURL, getAppOAuthURL } = useIntegration();
@@ -123,24 +123,15 @@ const buildAccountRow = (account: Account, config: {[key: string]: any}, onClick
 	};
 };
 
-const AskDialog = ({title, text, buttonOK, show, onCancel, onSubmit, textarea, defaultValue}: {title: string, text: string, buttonOK: string, show: boolean, onCancel: () => void, onSubmit: (val: string) => void, textarea: boolean, defaultValue?: string}) => {
-	const [value, setValue] = useState(defaultValue || '');
+const AskDialog = ({title, text, buttonOK, show, onChange, onCancel, onSubmit, textarea, value}: {title: string, text: string, buttonOK: string, show: boolean, onChange: (val: string) => void, onCancel: () => void, onSubmit: () => void, textarea: boolean, value: string}) => {
 	const ref = useRef<any>();
-	const onChange = useCallback(() => setValue(ref.current.value), [ref]);
+	const onChangeHandler = (evt: any) => onChange(evt.target.value);
 	useEffect(() => {
 		if (show && ref?.current) {
 			ref.current.focus();
 			ref.current.select();
 		}
 	}, [ref, show]);
-	const onCancelHandler = useCallback(() => {
-		onCancel();
-		setValue('');
-	}, [onCancel, setValue]);
-	const onSubmitHandler = useCallback(() => {
-		onSubmit(value || defaultValue || '');
-		setValue('');
-	}, [value, defaultValue, onSubmit, setValue]);
 	let field: React.ReactElement;
 	if (textarea) {
 		field = (
@@ -153,22 +144,22 @@ const AskDialog = ({title, text, buttonOK, show, onCancel, onSubmit, textarea, d
 					padding: '2px',
 					outline: 'none',
 				}}
-				value={value || defaultValue}
-				onChange={onChange} />
+				value={value}
+				onChange={onChangeHandler} />
 		);
 	} else {
 		field = (
 			<input
 				ref={ref}
 				type="text"
-				value={value || defaultValue}
+				value={value}
 				style={{
 					width: '450px',
 					fontSize: '1.5rem',
 					padding: '2px',
 					outline: 'none',
 				}}
-				onChange={onChange}
+				onChange={onChangeHandler}
 			/>
 		);
 	}
@@ -182,8 +173,8 @@ const AskDialog = ({title, text, buttonOK, show, onCancel, onSubmit, textarea, d
 				{field}
 			</p>
 			<div className="buttons">
-				<Button color="Mono" weight={500} onClick={onCancelHandler}>Cancel</Button>
-				<Button color="Green" weight={500} onClick={onSubmitHandler}>
+				<Button color="Mono" weight={500} onClick={onCancel}>Cancel</Button>
+				<Button color="Green" weight={500} onClick={onSubmit}>
 					<>{buttonOK}</>
 				</Button>
 			</div>
@@ -281,6 +272,7 @@ const ShowAccounts = ({api_key, config}: {api_key: string, config: {[key: string
 	const [accounts, setAccounts] = useState<any[]>([]);
 	const [account, setAccount] = useState<Account>();
 	const [exclusions, setExclusions] = useState('');
+	const [publicAcct, setPublicAcct] = useState('');
 	const [showAddAccountModal, setShowAddAccountModal] = useState(false);
 	const doShowAddAccountModal = useCallback(() => setShowAddAccountModal(true), []);
 	const [showAddExclusionModal, setShowAddExclusionModal] = useState(false);
@@ -329,15 +321,16 @@ const ShowAccounts = ({api_key, config}: {api_key: string, config: {[key: string
 			<ListPanel title="Accounts" rows={accounts} empty={<>No accounts found</>} />
 			<AskDialog
 				textarea={true}
-				defaultValue={exclusions}
+				value={exclusions}
 				show={showAddExclusionModal}
 				title="Add a set of ignore rules"
 				text="Enter repo exclusion rules using .gitignore pattern:"
 				buttonOK="Add"
 				onCancel={() => setShowAddExclusionModal(false)}
-				onSubmit={(val: string) => {
+				onChange={(val: string) => setExclusions(val)}
+				onSubmit={() => {
 					const excl = config.exclusions || {};
-					excl[account?.login!] = val;
+					excl[account?.login!] = exclusions;
 					config.exclusions = excl;
 					setShowAddExclusionModal(false);
 					setAccount(undefined);
@@ -351,10 +344,14 @@ const ShowAccounts = ({api_key, config}: {api_key: string, config: {[key: string
 				title="Add a Public Account"
 				text="What is the login or URL to the GitHub account?"
 				buttonOK="Add"
+				value={publicAcct}
 				onCancel={() => setShowAddAccountModal(false)}
-				onSubmit={(val: string) => {
+				onChange={(val: string) => setPublicAcct(val)}
+				onSubmit={() => {
 					// TODO: parse out url
 					setShowAddAccountModal(false);
+					const val = publicAcct;
+					setPublicAcct('');
 					fetchOrg(val, api_key, (account: Account) => {
 						const newaccts = [...accounts, buildAccountRow(account, config, doShowAddExclusionModal)];
 						setAccounts(newaccts);
@@ -367,15 +364,46 @@ const ShowAccounts = ({api_key, config}: {api_key: string, config: {[key: string
 	);
 };
 
-const ChooseIntegrationType = ({ type, setType }: { type: string, setType: (val: any) => void }) => {
+const chooseIntegrationStyles: any = {
+	container: {
+		fontSize: '1.6rem',
+		display:'flex',
+		alignItems: 'center',
+		justifyContent: 'center',
+		flexDirection: 'row',
+		width: '100%',
+		height: '400px',
+		cursor: 'pointer',
+	},
+	button: {
+		border: '1px solid #eee',
+		backgroundColor: Theme.Blue500,
+		borderRadius: '8px',
+		height: '200px',
+		width: '400px',
+		margin: '2rem',
+		textAlign: 'center',
+		padding: '2rem',
+		color: Theme.Mono100,
+		fontWeight: 'bold',
+		fontSize: '1.7rem',
+	},
+	icon: {
+		fontSize: '10rem',
+		marginBottom: '2rem',
+		color: Theme.Mono100,
+	}
+};
+
+const ChooseIntegrationType = ({ setType }: { setType: (val: any) => void }) => {
 	return (
-		<div style={{fontSize: '1.6rem'}}>
-			<div>
-				<input type="radio" name="integrationtype" value="CLOUD" checked={type === 'CLOUD'} onChange={() => setType('CLOUD')} />
-				I'm using GitHub.com to manage my data
+		<div style={chooseIntegrationStyles.container}>
+			<div style={chooseIntegrationStyles.button} onClick={() => setType('CLOUD')}>
+				<div><Icon icon={['fas', 'cloud']} style={chooseIntegrationStyles.icon} /></div>
+				<div>I'm using GitHub.com to manage my data using their cloud service</div>
 			</div>
-			<div>
-				<input type="radio" name="integrationtype" value="SELFMANAGED" checked={type === 'SELFMANAGED'} onChange={() => setType('SELFMANAGED')} />
+			<div style={chooseIntegrationStyles.button} onClick={() => setType('SELFMANAGED')}>
+				<div><Icon icon={['fas', 'home']} style={chooseIntegrationStyles.icon} /></div>
 				I'm using GitHub on my own systems or using a third-party managed GitHub service
 			</div>
 		</div>
@@ -460,10 +488,11 @@ const Integration = () => {
 			setRerender(Date.now());
 		}
 	}, [config, type, setConfig, setRerender]);
+	console.log(config);
 	if (!config.integrationType) {
-		return <ChooseIntegrationType type={type} setType={setType} />;
+		return <ChooseIntegrationType setType={setType} />;
 	}
-	if (!config.profile && type === 'CLOUD') {
+	if (!config.profile && config.integrationType === 'CLOUD') {
 		return <AuthorizationRequired />;
 	}
 	if (config.integrationType === 'SELFMANAGED') {

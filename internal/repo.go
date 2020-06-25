@@ -45,6 +45,7 @@ func (r repository) ToModel(customerID string, integrationID string, login strin
 		repo.Affiliation = sdk.SourceCodeRepoAffiliationThirdparty
 	} else {
 		if scope == userAccountType {
+			// TODO: need to check the user and determine if they are member of the org using the userManager
 			repo.Affiliation = sdk.SourceCodeRepoAffiliationUser
 		} else if scope == orgAccountType {
 			repo.Affiliation = sdk.SourceCodeRepoAffiliationOrganization

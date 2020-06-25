@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -333,19 +334,46 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 	sdk.LogInfo(logger, "export started")
 	pipe := export.Pipe()
 	config := export.Config()
-	// TODO: support other auth forms here
-	if config.APIKeyAuth == nil {
-		return fmt.Errorf("required api_key not found")
-	}
 	url := "https://api.github.com/graphql"
-	apikey := config.APIKeyAuth.APIKey
-	if config.APIKeyAuth.URL != "" {
-		url = config.APIKeyAuth.URL
+
+	if config.APIKeyAuth != nil {
+		apikey := config.APIKeyAuth.APIKey
+		if config.APIKeyAuth.URL != "" {
+			url = config.APIKeyAuth.URL
+		}
+		g.client = g.manager.GraphQLManager().New(url, map[string]string{
+			"Authorization": "bearer " + apikey,
+		})
+		sdk.LogInfo(logger, "using apikey authorization")
+	} else if config.OAuth2Auth != nil {
+		authToken := config.OAuth2Auth.AccessToken
+		if config.OAuth2Auth.RefreshToken != nil {
+			token, err := g.manager.RefreshOAuth2Token(refType, *config.OAuth2Auth.RefreshToken)
+			if err != nil {
+				return fmt.Errorf("error refreshing oauth2 access token: %w", err)
+			}
+			authToken = token
+		}
+		if config.OAuth2Auth.URL != "" {
+			url = config.OAuth2Auth.URL
+		}
+		g.client = g.manager.GraphQLManager().New(url, map[string]string{
+			"Authorization": "bearer " + authToken,
+		})
+		sdk.LogInfo(logger, "using oauth2 authorization")
+	} else if config.BasicAuth != nil {
+		if config.BasicAuth.URL != "" {
+			url = config.BasicAuth.URL
+		}
+		g.client = g.manager.GraphQLManager().New(url, map[string]string{
+			"Authorization": "Basic " + base64.StdEncoding.EncodeToString([]byte(config.BasicAuth.Username+":"+config.BasicAuth.Password)),
+		})
+		sdk.LogInfo(logger, "using basic authorization", "username", config.BasicAuth.Username)
+	} else {
+		return fmt.Errorf("supported authorization not provided. support for: apikey, oauth2, basic")
 	}
-	g.client = g.manager.GraphQLManager().New(url, map[string]string{
-		"Authorization": "bearer " + apikey,
-	})
-	sdk.LogDebug(logger, "export starting", "url", url)
+
+	sdk.LogInfo(logger, "export starting", "url", url)
 
 	var accounts *accounts
 	if config.Exists("accounts") {
