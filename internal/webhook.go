@@ -21,13 +21,13 @@ const (
 
 var webhookEvents = []string{"push", "pull_request", "commit_comment", "issue_comment", "issues", "project_card", "project_column", "project", "pull_request_review", "pull_request_review_comment", "repository", "milestone"}
 
-func (g *GithubIntegration) isOrgWebHookInstalled(state sdk.State, integrationID string) bool {
-	key := orgWebhookInstalledStateKeyPrefix + integrationID
+func (g *GithubIntegration) isOrgWebHookInstalled(state sdk.State, login string) bool {
+	key := orgWebhookInstalledStateKeyPrefix + login
 	return state.Exists(key)
 }
 
 func (g *GithubIntegration) installRepoWebhookIfRequired(customerID string, logger sdk.Logger, state sdk.State, client sdk.HTTPClient, login string, integrationID string, repo string) error {
-	if g.isOrgWebHookInstalled(state, integrationID) {
+	if g.isOrgWebHookInstalled(state, login) {
 		return nil
 	}
 	key := repoWebhookInstalledStateKeyPrefix + integrationID + "_" + repo
@@ -84,8 +84,8 @@ func (g *GithubIntegration) uninstallRepoWebhook(state sdk.State, client sdk.HTT
 }
 
 func (g *GithubIntegration) unregisterWebhook(state sdk.State, client sdk.HTTPClient, login string, integrationID string, hookendpoint string) error {
-	key := orgWebhookInstalledStateKeyPrefix + integrationID
-	if g.isOrgWebHookInstalled(state, integrationID) {
+	key := orgWebhookInstalledStateKeyPrefix + login
+	if g.isOrgWebHookInstalled(state, login) {
 		var id int64
 		found, err := state.Get(key, &id)
 		if err != nil {
@@ -114,7 +114,7 @@ func (g *GithubIntegration) unregisterWebhook(state sdk.State, client sdk.HTTPCl
 }
 
 func (g *GithubIntegration) registerWebhook(customerID string, state sdk.State, client sdk.HTTPClient, login string, integrationID string, hookendpoint string) error {
-	if g.isOrgWebHookInstalled(state, integrationID) {
+	if g.isOrgWebHookInstalled(state, login) {
 		return nil
 	}
 	webhooks := make([]webhookResponse, 0)
@@ -155,7 +155,7 @@ func (g *GithubIntegration) registerWebhook(customerID string, state sdk.State, 
 			return fmt.Errorf("error creating webhook for %s: %w", login, err)
 		}
 		if resp.StatusCode == http.StatusCreated {
-			key := orgWebhookInstalledStateKeyPrefix + integrationID
+			key := orgWebhookInstalledStateKeyPrefix + login
 			if err := state.Set(key, kv["id"]); err != nil {
 				return fmt.Errorf("error saving webhook url to state: %w", err)
 			}
