@@ -51,6 +51,7 @@ type UserManager struct {
 	export      sdk.Export
 	pipe        sdk.Pipe
 	integration *GithubIntegration
+	client      sdk.GraphQLClient
 	mu          sync.Mutex
 }
 
@@ -80,7 +81,7 @@ func (u *UserManager) emitAuthor(logger sdk.Logger, author author) error {
 			// go to GitHub and find out if this user is a current member of our organization
 			var result userOrgResult
 			sdk.LogDebug(logger, "need to fetch user org details", "ref_id", refID)
-			if err := u.integration.client.Query(getUserOrgsQuery, map[string]interface{}{"id": author.ID}, &result); err != nil {
+			if err := u.client.Query(getUserOrgsQuery, map[string]interface{}{"id": author.ID}, &result); err != nil {
 				u.mu.Unlock()
 				if u.integration.checkForAbuseDetection(logger, u.export, err) {
 					u.mu.Lock()
@@ -130,7 +131,7 @@ func (u *UserManager) emitGitUser(logger sdk.Logger, author gitUser) error {
 			// go to GitHub and find out if this user is a current member of our organization
 			var result userOrgResult
 			sdk.LogDebug(logger, "need to fetch user org details", "ref_id", refID)
-			if err := u.integration.client.Query(getUserOrgsQuery, map[string]interface{}{"id": author.User.ID}, &result); err != nil {
+			if err := u.client.Query(getUserOrgsQuery, map[string]interface{}{"id": author.User.ID}, &result); err != nil {
 				u.mu.Unlock()
 				if u.integration.checkForAbuseDetection(logger, u.export, err) {
 					u.mu.Lock()
@@ -164,7 +165,7 @@ func (u *UserManager) emitGitUser(logger sdk.Logger, author gitUser) error {
 }
 
 // NewUserManager returns a new instance
-func NewUserManager(customerID string, orgs []string, export sdk.Export, pipe sdk.Pipe, integration *GithubIntegration) *UserManager {
+func NewUserManager(customerID string, orgs []string, export sdk.Export, pipe sdk.Pipe, integration *GithubIntegration, client sdk.GraphQLClient) *UserManager {
 	return &UserManager{
 		customerID:  customerID,
 		orgs:        orgs,
@@ -172,5 +173,6 @@ func NewUserManager(customerID string, orgs []string, export sdk.Export, pipe sd
 		export:      export,
 		pipe:        pipe,
 		integration: integration,
+		client:      client,
 	}
 }

@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/pinpt/agent.next/sdk"
@@ -11,7 +12,6 @@ type GithubIntegration struct {
 	logger  sdk.Logger
 	config  sdk.Config
 	manager sdk.Manager
-	client  sdk.GraphQLClient
 	lock    sync.Mutex
 }
 
@@ -28,18 +28,42 @@ func (g *GithubIntegration) Start(logger sdk.Logger, config sdk.Config, manager 
 
 // Enroll is called when a new integration instance is added
 func (g *GithubIntegration) Enroll(instance sdk.Instance) error {
-	// FIXME: add the web hook for this integration
+	// attempt to add an org level web hook
+	config := instance.Config()
+	state := instance.State()
+	if config.IntegrationType == sdk.CloudIntegration && config.OAuth2Auth != nil {
+		_, client, err := g.newHTTPClient(g.logger, config)
+		if err != nil {
+			return fmt.Errorf("error creating http client: %w", err)
+		}
+		for login, acct := range *config.Accounts {
+			if acct.Type == sdk.ConfigAccountTypeOrg {
+				if err := g.registerWebhook(instance.CustomerID(), state, client, login, instance.IntegrationID(), "/orgs/"+login+"/hooks"); err != nil {
+					return fmt.Errorf("error creating webhook. %w", err)
+				}
+			}
+		}
+	}
 	return nil
 }
 
 // Dismiss is called when an existing integration instance is removed
 func (g *GithubIntegration) Dismiss(instance sdk.Instance) error {
-	// FIXME: remove integration
-	return nil
-}
-
-// WebHook is called when a webhook is received on behalf of the integration
-func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
+	config := instance.Config()
+	if config.IntegrationType == sdk.CloudIntegration && config.OAuth2Auth != nil {
+		_, client, err := g.newHTTPClient(g.logger, config)
+		if err != nil {
+			return fmt.Errorf("error creating http client: %w", err)
+		}
+		for login, acct := range *config.Accounts {
+			if acct.Type == sdk.ConfigAccountTypeOrg {
+				if err := g.unregisterWebhook(instance.State(), client, login, instance.IntegrationID(), "/orgs/"+login+"/hooks"); err != nil {
+					sdk.LogError(g.logger, "error unregistering webhook", "login", login, "err", err)
+				}
+			}
+		}
+	}
+	instance.State().Delete(previousReposStateKey)
 	return nil
 }
 
