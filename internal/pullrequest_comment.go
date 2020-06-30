@@ -26,7 +26,7 @@ type pullrequestcomment struct {
 	Body      string    `json:"bodyHTML"`
 }
 
-func (c pullrequestcomment) ToModel(logger sdk.Logger, userManager *UserManager, customerID string, repoID string, pullRequestID string) *sdk.SourceCodePullRequestComment {
+func (c pullrequestcomment) ToModel(logger sdk.Logger, userManager *UserManager, customerID string, repoID string, pullRequestID string) (*sdk.SourceCodePullRequestComment, error) {
 	comment := &sdk.SourceCodePullRequestComment{}
 	comment.CustomerID = customerID
 	comment.RepoID = repoID
@@ -49,7 +49,9 @@ func (c pullrequestcomment) ToModel(logger sdk.Logger, userManager *UserManager,
 		Rfc3339: ud.Rfc3339,
 		Offset:  ud.Offset,
 	}
+	if err := userManager.emitAuthor(logger, c.Author); err != nil {
+		return nil, err
+	}
 	comment.UserRefID = c.Author.RefID(customerID)
-	userManager.emitAuthor(logger, c.Author)
-	return comment
+	return comment, nil
 }

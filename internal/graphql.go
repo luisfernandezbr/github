@@ -194,6 +194,93 @@ query GetPullRequests($name: String!, $owner: String!, $first: Int!, $after: Str
 }
 `
 
+var pullrequestCommentsPagedQuery = `
+query GetPullRequestComments($name: String!, $owner: String!, $first: Int!, $after: String, $number: Int!) {
+	repository(name: $name, owner: $owner) {
+		pullRequest(number: $number) {
+			comments(first: $first, after: $after) {
+				totalCount
+				pageInfo {
+					hasNextPage
+					startCursor
+					endCursor
+				}
+				edges {
+					cursor
+					node {
+						id
+						createdAt
+						updatedAt
+						url
+						bodyHTML
+						author {
+							type: __typename
+							avatarUrl
+							login
+							url
+							...on User {
+								id
+								email
+								name
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	rateLimit {
+		limit
+		cost
+		remaining
+		resetAt
+	}
+}
+`
+
+var pullrequestReviewsPagedQuery = `
+query GetPullRequestReviews($name: String!, $owner: String!, $first: Int!, $after: String, $number: Int!) {
+	repository(name: $name, owner: $owner) {
+		pullRequest(number: $number) {
+			reviews(first: $first, after: $after) {
+				totalCount
+				pageInfo {
+					hasNextPage
+					startCursor
+					endCursor
+				}
+				edges {
+					cursor
+					node {
+						id
+						state
+						createdAt
+						url
+						author {
+							type: __typename
+							avatarUrl
+							login
+							url
+							...on User {
+								id
+								email
+								name
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	rateLimit {
+		limit
+		cost
+		remaining
+		resetAt
+	}
+}
+`
+
 type allOrgViewOrg struct {
 	Organizations organizations `json:"organizations"`
 }
@@ -309,6 +396,7 @@ func generateViewerLogin() string {
 
 type repoName struct {
 	ID         string `json:"id"`
+	RepoName   string `json:"name"`
 	Name       string `json:"nameWithOwner"`
 	IsPrivate  bool   `json:"isPrivate"`
 	IsArchived bool   `json:"isArchived"`
@@ -345,6 +433,7 @@ func generateAllReposQuery(after string, scope string) string {
 				}
 				nodes {
 					id
+					name
 					nameWithOwner
 					isPrivate
 					isArchived

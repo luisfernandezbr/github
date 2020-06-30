@@ -17,7 +17,7 @@ type pullrequestCommit struct {
 	Committer gitUser   `json:"committer"`
 }
 
-func (c pullrequestCommit) ToModel(logger sdk.Logger, userManager *UserManager, customerID string, repoID string, prID string) *sdk.SourceCodePullRequestCommit {
+func (c pullrequestCommit) ToModel(logger sdk.Logger, userManager *UserManager, customerID string, repoID string, prID string) (*sdk.SourceCodePullRequestCommit, error) {
 	commit := &sdk.SourceCodePullRequestCommit{}
 	commit.CustomerID = customerID
 	commit.RepoID = repoID
@@ -39,9 +39,13 @@ func (c pullrequestCommit) ToModel(logger sdk.Logger, userManager *UserManager, 
 		Rfc3339: dt.Rfc3339,
 		Offset:  dt.Offset,
 	}
-	userManager.emitGitUser(logger, c.Author)
-	userManager.emitGitUser(logger, c.Committer)
-	return commit
+	if err := userManager.emitGitUser(logger, c.Author); err != nil {
+		return nil, err
+	}
+	if err := userManager.emitGitUser(logger, c.Committer); err != nil {
+		return nil, err
+	}
+	return commit, nil
 }
 
 type pullrequestcommit struct {

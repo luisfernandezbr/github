@@ -10,12 +10,14 @@ import (
 	"time"
 
 	"github.com/pinpt/agent.next/sdk"
+	"github.com/pinpt/go-common/v10/datetime"
 )
 
 const (
 	defaultPageSize                  = 50
 	defaultRetryPageSize             = 25
 	defaultPullRequestCommitPageSize = 100
+	previousReposStateKey            = "previous_repos"
 )
 
 type job func(export sdk.Export, pipe sdk.Pipe) error
@@ -106,7 +108,10 @@ func (g *GithubIntegration) fetchPullRequestCommits(logger sdk.Logger, userManag
 		g.lock.Unlock()
 		retryCount = 0
 		for _, edge := range result.Node.Commits.Edges {
-			prcommit := edge.Node.Commit.ToModel(logger, userManager, customerID, repoID, pullRequestID)
+			prcommit, err := edge.Node.Commit.ToModel(logger, userManager, customerID, repoID, pullRequestID)
+			if err != nil {
+				return nil, err
+			}
 			commits = append(commits, prcommit)
 		}
 		if err := g.checkForRateLimit(logger, export, result.RateLimit); err != nil {
@@ -156,17 +161,26 @@ func (g *GithubIntegration) queuePullRequestJob(logger sdk.Logger, userManager *
 			for _, predge := range result.Repository.Pullrequests.Edges {
 				pullrequest := predge.Node.ToModel(logger, userManager, customerID, fullname, repoID)
 				for _, reviewedge := range predge.Node.Reviews.Edges {
-					prreview := reviewedge.Node.ToModel(logger, userManager, customerID, repoID, pullrequest.ID)
+					prreview, err := reviewedge.Node.ToModel(logger, userManager, customerID, repoID, pullrequest.ID)
+					if err != nil {
+						return err
+					}
 					if err := pipe.Write(prreview); err != nil {
 						return err
 					}
 				}
 				if predge.Node.Reviews.PageInfo.HasNextPage {
-					// TODO: queue
+					job := g.queuePullRequestReviewsJob(logger, userManager, repoOwner, repoName, repoID, pullrequest.ID, predge.Node.Number, predge.Node.Reviews.PageInfo.EndCursor)
+					if err := job(export, pipe); err != nil {
+						return err
+					}
 				}
 				commits := make([]*sdk.SourceCodePullRequestCommit, 0)
 				for _, commitedge := range predge.Node.Commits.Edges {
-					prcommit := commitedge.Node.Commit.ToModel(logger, userManager, customerID, repoID, pullrequest.ID)
+					prcommit, err := commitedge.Node.Commit.ToModel(logger, userManager, customerID, repoID, pullrequest.ID)
+					if err != nil {
+						return err
+					}
 					commits = append(commits, prcommit)
 				}
 				if predge.Node.Commits.PageInfo.HasNextPage {
@@ -197,6 +211,130 @@ func (g *GithubIntegration) queuePullRequestJob(logger sdk.Logger, userManager *
 				return err
 			}
 			variables["after"] = result.Repository.Pullrequests.PageInfo.EndCursor
+		}
+		return nil
+	}
+}
+
+func (g *GithubIntegration) queuePullRequestCommentsJob(logger sdk.Logger, userManager *UserManager, repoOwner string, repoName string, repoID string, prID string, prNumber int, cursor string) job {
+	return func(export sdk.Export, pipe sdk.Pipe) error {
+		sdk.LogInfo(logger, "need to run a pull request comments job starting from "+cursor, "name", repoName, "owner", repoOwner)
+		var variables = map[string]interface{}{
+			"first":  defaultPageSize,
+			"after":  cursor,
+			"owner":  repoOwner,
+			"name":   repoName,
+			"number": prNumber,
+		}
+		customerID := export.CustomerID()
+		fullname := repoOwner + "/" + repoName
+		var retryCount int
+		for {
+			sdk.LogDebug(logger, "running queued pullrequests comments export", "number", prID, "repo", fullname, "after", variables["after"], "limit", variables["first"], "retryCount", retryCount)
+			var result struct {
+				RateLimit  rateLimit `json:"rateLimit"`
+				Repository struct {
+					PullRequest struct {
+						Comments pullrequestcomments `json:"comments"`
+					} `json:"pullRequest"`
+				} `json:"repository"`
+			}
+			g.lock.Lock() // just to prevent too many GH requests
+			if err := g.client.Query(pullrequestCommentsPagedQuery, variables, &result); err != nil {
+				g.lock.Unlock()
+				if g.checkForAbuseDetection(logger, export, err) {
+					continue
+				}
+				if g.checkForRetryableError(logger, export, err) {
+					retryCount++
+					variables["first"] = defaultRetryPageSize // back off the page size to see if this will help
+					if retryCount >= 10 {
+						return fmt.Errorf("failed to export after retrying 10 times for %s", fullname)
+					}
+					continue
+				}
+				return err
+			}
+			g.lock.Unlock()
+			retryCount = 0
+			for _, edge := range result.Repository.PullRequest.Comments.Edges {
+				prcomment, err := edge.Node.ToModel(logger, userManager, customerID, repoID, prID)
+				if err != nil {
+					return err
+				}
+				if err := pipe.Write(prcomment); err != nil {
+					return err
+				}
+			}
+			if !result.Repository.PullRequest.Comments.PageInfo.HasNextPage {
+				break
+			}
+			if err := g.checkForRateLimit(logger, export, result.RateLimit); err != nil {
+				return err
+			}
+			variables["after"] = result.Repository.PullRequest.Comments.PageInfo.EndCursor
+		}
+		return nil
+	}
+}
+
+func (g *GithubIntegration) queuePullRequestReviewsJob(logger sdk.Logger, userManager *UserManager, repoOwner string, repoName string, repoID string, prID string, prNumber int, cursor string) job {
+	return func(export sdk.Export, pipe sdk.Pipe) error {
+		sdk.LogInfo(logger, "need to run a pull request reviews job starting from "+cursor, "name", repoName, "owner", repoOwner)
+		var variables = map[string]interface{}{
+			"first":  defaultPageSize,
+			"after":  cursor,
+			"owner":  repoOwner,
+			"name":   repoName,
+			"number": prNumber,
+		}
+		customerID := export.CustomerID()
+		fullname := repoOwner + "/" + repoName
+		var retryCount int
+		for {
+			sdk.LogDebug(logger, "running queued pullrequests reviews export", "number", prID, "repo", fullname, "after", variables["after"], "limit", variables["first"], "retryCount", retryCount)
+			var result struct {
+				RateLimit  rateLimit `json:"rateLimit"`
+				Repository struct {
+					PullRequest struct {
+						Reviews pullrequestreviews `json:"reviews"`
+					} `json:"pullRequest"`
+				} `json:"repository"`
+			}
+			g.lock.Lock() // just to prevent too many GH requests
+			if err := g.client.Query(pullrequestReviewsPagedQuery, variables, &result); err != nil {
+				g.lock.Unlock()
+				if g.checkForAbuseDetection(logger, export, err) {
+					continue
+				}
+				if g.checkForRetryableError(logger, export, err) {
+					retryCount++
+					variables["first"] = defaultRetryPageSize // back off the page size to see if this will help
+					if retryCount >= 10 {
+						return fmt.Errorf("failed to export after retrying 10 times for %s", fullname)
+					}
+					continue
+				}
+				return err
+			}
+			g.lock.Unlock()
+			retryCount = 0
+			for _, edge := range result.Repository.PullRequest.Reviews.Edges {
+				prreview, err := edge.Node.ToModel(logger, userManager, customerID, repoID, prID)
+				if err != nil {
+					return err
+				}
+				if err := pipe.Write(prreview); err != nil {
+					return err
+				}
+			}
+			if !result.Repository.PullRequest.Reviews.PageInfo.HasNextPage {
+				break
+			}
+			if err := g.checkForRateLimit(logger, export, result.RateLimit); err != nil {
+				return err
+			}
+			variables["after"] = result.Repository.PullRequest.Reviews.PageInfo.EndCursor
 		}
 		return nil
 	}
@@ -449,7 +587,6 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 		if err != nil {
 			return err
 		}
-		// TODO: check and see if the repo is no longer in the previous fetch session
 		for _, repo := range userrepos {
 			if includeRepo(login, repo.Name, repo.IsArchived) {
 				repo.Scope = userAccountType
@@ -466,7 +603,6 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 		if err != nil {
 			return err
 		}
-		// TODO: check and see if the repo is no longer in the previous fetch session
 		for _, repo := range orgrepos {
 			if includeRepo(login, repo.Name, repo.IsArchived) {
 				repo.Scope = orgAccountType
@@ -490,47 +626,88 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 	started := time.Now()
 	state := export.State()
 	var repoCount, prCount, reviewCount, commitCount, commentCount int
+	var hasPreviousRepos bool
+	previousRepos := make(map[string]*sdk.SourceCodeRepo)
+
+	if state.Exists(previousReposStateKey) {
+		if _, err := state.Get(previousReposStateKey, &previousRepos); err != nil {
+			sdk.LogError(logger, "error fetching previous repos state", "err", err)
+		} else {
+			hasPreviousRepos = true
+		}
+	}
+
+	if hasPreviousRepos {
+		// make all the repos in this batch so we can see if any of the previous weren't
+		reposFound := make(map[string]bool)
+		for _, node := range therepos {
+			reposFound[node.Name] = true
+		}
+		for _, repo := range previousRepos {
+			// if not found, it may be that we're now excluding it OR
+			// it could mean that the repo has been deleted/removed
+			// in either case we need to mark the repo as inactive
+			if !reposFound[repo.Name] {
+				repo.Active = false
+				repo.UpdatedAt = datetime.EpochNow()
+				sdk.LogInfo(logger, "deactivating a repo no longer processed", "name", repo.Name)
+				if err := pipe.Write(repo); err != nil {
+					return err
+				}
+			}
+		}
+	}
 
 	for _, node := range therepos {
 		sdk.LogInfo(logger, "processing repo: "+node.Name, "id", node.ID)
 		repoCount++
 		r := repos[node.Name]
 		repo := node.ToModel(customerID, integrationID, r.Login, r.IsPrivate, r.Scope)
+		previousRepos[node.Name] = repo // remember it
 		if err := pipe.Write(repo); err != nil {
 			return err
 		}
 		for _, predge := range node.Pullrequests.Edges {
 			pullrequest := predge.Node.ToModel(logger, userManager, customerID, repo.Name, repo.ID)
 			for _, reviewedge := range predge.Node.Reviews.Edges {
-				prreview := reviewedge.Node.ToModel(logger, userManager, customerID, repo.ID, pullrequest.ID)
-				if err := pipe.Write(prreview); err != nil {
+				prreview, err := reviewedge.Node.ToModel(logger, userManager, customerID, repo.ID, pullrequest.ID)
+				if err != nil {
 					return err
+				}
+				if err := pipe.Write(prreview); err != nil {
+					return fmt.Errorf("error fetching review for pull request %s for repo: %v. %w", pullrequest.ID, r.Name, err)
 				}
 				reviewCount++
 			}
 			if predge.Node.Reviews.PageInfo.HasNextPage {
-				// TODO: queue
+				jobs = append(jobs, g.queuePullRequestReviewsJob(logger, userManager, r.Login, r.RepoName, repo.GetID(), pullrequest.ID, predge.Node.Number, predge.Node.Comments.PageInfo.EndCursor))
 			}
 			for _, commentedge := range predge.Node.Comments.Edges {
-				prcomment := commentedge.Node.ToModel(logger, userManager, customerID, repo.ID, pullrequest.ID)
-				if err := pipe.Write(prcomment); err != nil {
+				prcomment, err := commentedge.Node.ToModel(logger, userManager, customerID, repo.ID, pullrequest.ID)
+				if err != nil {
 					return err
+				}
+				if err := pipe.Write(prcomment); err != nil {
+					return fmt.Errorf("error fetching comment for pull request %s for repo: %v. %w", pullrequest.ID, r.Name, err)
 				}
 				commentCount++
 			}
 			if predge.Node.Comments.PageInfo.HasNextPage {
-				// TODO: queue
+				jobs = append(jobs, g.queuePullRequestCommentsJob(logger, userManager, r.Login, r.RepoName, repo.GetID(), pullrequest.ID, predge.Node.Number, predge.Node.Comments.PageInfo.EndCursor))
 			}
 			commits := make([]*sdk.SourceCodePullRequestCommit, 0)
 			for _, commitedge := range predge.Node.Commits.Edges {
-				prcommit := commitedge.Node.Commit.ToModel(logger, userManager, customerID, repo.ID, pullrequest.ID)
+				prcommit, err := commitedge.Node.Commit.ToModel(logger, userManager, customerID, repo.ID, pullrequest.ID)
+				if err != nil {
+					return err
+				}
 				commits = append(commits, prcommit)
 			}
 			if predge.Node.Commits.PageInfo.HasNextPage {
 				// fetch all the remaining paged commits
 				morecommits, err := g.fetchPullRequestCommits(logger, userManager, export, repo.Name, predge.Node.ID, pullrequest.RepoID, predge.Node.Commits.PageInfo.EndCursor)
 				if err != nil {
-					return err
+					return fmt.Errorf("error fetching commits for pull request %s for repo: %v. %w", pullrequest.ID, r.Name, err)
 				}
 				commits = append(commits, morecommits...)
 				sdk.LogDebug(logger, "fetched pull request commits", "count", len(commits), "pullrequest_id", predge.Node.ID, "repo", repo.Name)
@@ -555,10 +732,14 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 			return fmt.Errorf("error saving repo state: %w", err)
 		}
 		if node.Pullrequests.PageInfo.HasNextPage {
-			tok := strings.Split(node.Name, "/")
 			// queue the pull requests for the next page
-			jobs = append(jobs, g.queuePullRequestJob(logger, userManager, tok[0], tok[1], repo.GetID(), node.Pullrequests.PageInfo.EndCursor))
+			jobs = append(jobs, g.queuePullRequestJob(logger, userManager, r.Login, r.RepoName, repo.GetID(), node.Pullrequests.PageInfo.EndCursor))
 		}
+	}
+
+	// remember the repos we processed
+	if err := state.Set(previousReposStateKey, previousRepos); err != nil {
+		return fmt.Errorf("error saving previous repos state: %w", err)
 	}
 
 	sdk.LogInfo(logger, "initial export completed", "duration", time.Since(started), "repoCount", repoCount, "prCount", prCount, "reviewCount", reviewCount, "commitCount", commitCount, "commentCount", commentCount)

@@ -102,6 +102,7 @@ func (a gitUser) ToModel(customerID string, integrationID string) *sdk.SourceCod
 	switch a.User.Type {
 	case "Bot":
 		user.Type = sdk.SourceCodeUserTypeBot
+		user.Username = sdk.StringPointer(a.User.Login)
 	case "User":
 		user.Type = sdk.SourceCodeUserTypeHuman
 		user.Username = sdk.StringPointer(a.User.Login)

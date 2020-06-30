@@ -25,7 +25,7 @@ type pullrequestreview struct {
 	URL       string    `json:"url"`
 }
 
-func (r pullrequestreview) ToModel(logger sdk.Logger, userManager *UserManager, customerID string, repoID string, prID string) *sdk.SourceCodePullRequestReview {
+func (r pullrequestreview) ToModel(logger sdk.Logger, userManager *UserManager, customerID string, repoID string, prID string) (*sdk.SourceCodePullRequestReview, error) {
 	prreview := &sdk.SourceCodePullRequestReview{}
 	prreview.CustomerID = customerID
 	prreview.ID = sdk.NewSourceCodePullRequestReviewID(customerID, r.ID, refType, repoID)
@@ -54,6 +54,8 @@ func (r pullrequestreview) ToModel(logger sdk.Logger, userManager *UserManager, 
 		prreview.State = sdk.SourceCodePullRequestReviewStateDismissed
 	}
 	prreview.UserRefID = r.Author.RefID(customerID)
-	userManager.emitAuthor(logger, r.Author)
-	return prreview
+	if err := userManager.emitAuthor(logger, r.Author); err != nil {
+		return nil, err
+	}
+	return prreview, nil
 }
