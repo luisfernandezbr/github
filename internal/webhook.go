@@ -60,6 +60,10 @@ func (g *GithubIntegration) installRepoWebhookIfRequired(customerID string, logg
 	kv := make(map[string]interface{})
 	resp, err := client.Post(strings.NewReader(sdk.Stringify(params)), &kv, sdk.WithEndpoint("/repos/"+repo+"/hooks"))
 	if err != nil {
+		if err.Error() == "HTTP Error: 404" {
+			sdk.LogInfo(logger, "not authorized to create webhooks for repo", "login", login, "repo", repo)
+			return nil
+		}
 		return fmt.Errorf("error creating webhook for %s: %w", login, err)
 	}
 	if resp.StatusCode == http.StatusCreated {
