@@ -44,7 +44,6 @@ func (g *GithubIntegration) installRepoWebhookIfRequired(customerID string, logg
 	if err != nil {
 		return fmt.Errorf("error creating webhook url for %s: %w", login, err)
 	}
-	url += "?integration_id=" + integrationID
 	// need to try and install
 	params := map[string]interface{}{
 		"name": "web",
