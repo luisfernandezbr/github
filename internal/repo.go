@@ -22,7 +22,7 @@ type repository struct {
 	} `json:"owner"`
 }
 
-func (r repository) ToModel(customerID string, integrationID string, login string, isPrivate bool, scope accountType) *sdk.SourceCodeRepo {
+func (r repository) ToModel(customerID string, integrationID string, login string, isPrivate bool, scope sdk.ConfigAccountType) *sdk.SourceCodeRepo {
 	repo := &sdk.SourceCodeRepo{}
 	repo.ID = sdk.NewSourceCodeRepoID(customerID, repo.ID, refType)
 	repo.CustomerID = customerID
@@ -44,10 +44,10 @@ func (r repository) ToModel(customerID string, integrationID string, login strin
 	if r.IsFork || r.Owner.Login != login {
 		repo.Affiliation = sdk.SourceCodeRepoAffiliationThirdparty
 	} else {
-		if scope == userAccountType {
+		if scope == sdk.ConfigAccountTypeUser {
 			// TODO: need to check the user and determine if they are member of the org using the userManager
 			repo.Affiliation = sdk.SourceCodeRepoAffiliationUser
-		} else if scope == orgAccountType {
+		} else if scope == sdk.ConfigAccountTypeOrg {
 			repo.Affiliation = sdk.SourceCodeRepoAffiliationOrganization
 		}
 	}

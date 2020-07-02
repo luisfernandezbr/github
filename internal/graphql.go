@@ -3,6 +3,8 @@ package internal
 import (
 	"fmt"
 	"time"
+
+	"github.com/pinpt/agent.next/sdk"
 )
 
 const refType = "github"
@@ -400,7 +402,7 @@ type repoName struct {
 	Name       string `json:"nameWithOwner"`
 	IsPrivate  bool   `json:"isPrivate"`
 	IsArchived bool   `json:"isArchived"`
-	Scope      accountType
+	Scope      sdk.ConfigAccountType
 	Login      string
 }
 
