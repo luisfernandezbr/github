@@ -172,6 +172,6 @@ func (g *GithubIntegration) registerWebhook(customerID string, state sdk.State, 
 // WebHook is called when a webhook is received on behalf of the integration
 func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 	// FIXME: implement this
-	sdk.LogInfo(g.logger, "webhook received", "payload", sdk.Stringify(webhook))
+	sdk.LogInfo(g.logger, "webhook received", "payload", sdk.Stringify(webhook.Data()))
 	return nil
 }
