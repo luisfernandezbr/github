@@ -645,7 +645,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 	for _, login := range users {
 		userrepos, err := g.fetchAllRepos(logger, client, export, login, "user")
 		if err != nil {
-			return err
+			return fmt.Errorf("error fetching all repos for user %s: %w", login, err)
 		}
 		for _, repo := range userrepos {
 			if includeRepo(login, repo.Name, repo.IsArchived) {
@@ -661,7 +661,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 	for _, login := range orgs {
 		orgrepos, err := g.fetchAllRepos(logger, client, export, login, "organization")
 		if err != nil {
-			return err
+			return fmt.Errorf("error fetching all repos for org %s: %w", login, err)
 		}
 		for _, repo := range orgrepos {
 			if includeRepo(login, repo.Name, repo.IsArchived) {
@@ -676,7 +676,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 	// fetch the repo data to include all the related entities like pull requests etc
 	therepos, err := g.fetchRepos(logger, client, export, reponames)
 	if err != nil {
-		return err
+		return fmt.Errorf("error fetching repos: %w", err)
 	}
 
 	customerID := export.CustomerID()
