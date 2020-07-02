@@ -573,22 +573,11 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 
 	sdk.LogInfo(logger, "export starting", "url", url)
 
-	var accounts *accounts
-	if config.Exists("accounts") {
-		acc, err := parseAccounts(config)
-		if err != nil {
-			return fmt.Errorf("error parsing accounts configuration: %w", err)
-		}
-		accounts = &acc
-	} else {
-		sdk.LogInfo(logger, "no accounts configured, will do all member orgs")
-	}
-
 	// TODO: add skip public repos since we're going to have a specific customer_id (empty) to do those in the future
 
 	var orgs []string
 	var users []string
-	if accounts == nil {
+	if config.Accounts == nil {
 		// first we're going to fetch all the organizations that the viewer is a member of if accounts if nil
 		var allorgs allOrgsResult
 		for {
@@ -613,8 +602,8 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 		}
 		users = append(users, viewer)
 	} else {
-		for _, acct := range *accounts {
-			if acct.Type == orgAccountType {
+		for _, acct := range *config.Accounts {
+			if acct.Type == sdk.ConfigAccountTypeOrg {
 				orgs = append(orgs, acct.ID)
 			} else {
 				users = append(users, acct.ID)
@@ -649,7 +638,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 		}
 		for _, repo := range userrepos {
 			if includeRepo(login, repo.Name, repo.IsArchived) {
-				repo.Scope = userAccountType
+				repo.Scope = sdk.ConfigAccountTypeUser
 				repo.Login = login
 				repos[repo.Name] = repo
 				reponames = append(reponames, repo.Name)
@@ -665,7 +654,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 		}
 		for _, repo := range orgrepos {
 			if includeRepo(login, repo.Name, repo.IsArchived) {
-				repo.Scope = orgAccountType
+				repo.Scope = sdk.ConfigAccountTypeOrg
 				repo.Login = login
 				repos[repo.Name] = repo
 				reponames = append(reponames, repo.Name)
