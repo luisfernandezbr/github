@@ -615,9 +615,9 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 	} else {
 		for _, acct := range *accounts {
 			if acct.Type == orgAccountType {
-				orgs = append(orgs, acct.Login)
+				orgs = append(orgs, acct.ID)
 			} else {
-				users = append(users, acct.Login)
+				users = append(users, acct.ID)
 			}
 		}
 	}

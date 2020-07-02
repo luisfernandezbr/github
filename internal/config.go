@@ -10,7 +10,7 @@ const (
 )
 
 type configAccount struct {
-	Login  string      `json:"login"`
+	ID     string      `json:"id"`
 	Type   accountType `json:"type"`
 	Public bool        `json:"public"`
 }
