@@ -7,14 +7,14 @@ import (
 )
 
 type pullrequestcommentsNode struct {
-	Cursor string
-	Node   pullrequestcomment
+	Cursor string             `json:"cursor"`
+	Node   pullrequestcomment `json:"node"`
 }
 
 type pullrequestcomments struct {
-	TotalCount int
-	PageInfo   pageInfo
-	Edges      []pullrequestcommentsNode
+	TotalCount int                       `json:"totalCount"`
+	PageInfo   pageInfo                  `json:"pageInfo"`
+	Edges      []pullrequestcommentsNode `json:"edges"`
 }
 
 type pullrequestcomment struct {

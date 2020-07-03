@@ -120,31 +120,31 @@ type repositoryPullrequests struct {
 }
 
 type pullrequestNode struct {
-	Cursor string
-	Node   pullrequest
+	Cursor string      `json:"cursor"`
+	Node   pullrequest `json:"node"`
 }
 
 type pullrequests struct {
-	TotalCount int
-	PageInfo   pageInfo
-	Edges      []pullrequestNode
+	TotalCount int               `json:"totalCount"`
+	PageInfo   pageInfo          `json:"pageInfo"`
+	Edges      []pullrequestNode `json:"edges"`
 }
 
 type pullrequestPagedCommit struct {
 	Commit pullrequestCommit `json:"commit"`
 }
 type pullrequestPagedCommitNode struct {
-	Node pullrequestPagedCommit
+	Node pullrequestPagedCommit `json:"node"`
 }
 
 type pullrequestPagedCommitEdges struct {
-	Cursor string
+	Cursor string                       `json:"cursor"`
 	Edges  []pullrequestPagedCommitNode `json:"edges"`
 }
 
 type pullrequestPagedCommits struct {
-	TotalCount int
-	PageInfo   pageInfo
+	TotalCount int                         `json:"totalCount"`
+	PageInfo   pageInfo                    `json:"pageInfo"`
 	Commits    pullrequestPagedCommitEdges `json:"commits"`
 }
 

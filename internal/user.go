@@ -44,6 +44,7 @@ type userOrgResult struct {
 }
 
 // UserManager is a manager for users
+//easyjson:skip
 type UserManager struct {
 	customerID  string
 	orgs        []string

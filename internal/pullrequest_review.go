@@ -7,8 +7,8 @@ import (
 )
 
 type pullrequestreviewsNode struct {
-	Cursor string
-	Node   pullrequestreview
+	Cursor string            `json:"cursor"`
+	Node   pullrequestreview `json:"node"`
 }
 
 type pullrequestreviews struct {

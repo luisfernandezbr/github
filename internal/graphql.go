@@ -397,13 +397,13 @@ func generateViewerLogin() string {
 }
 
 type repoName struct {
-	ID         string `json:"id"`
-	RepoName   string `json:"name"`
-	Name       string `json:"nameWithOwner"`
-	IsPrivate  bool   `json:"isPrivate"`
-	IsArchived bool   `json:"isArchived"`
-	Scope      sdk.ConfigAccountType
-	Login      string
+	ID         string                `json:"id"`
+	RepoName   string                `json:"name"`
+	Name       string                `json:"nameWithOwner"`
+	IsPrivate  bool                  `json:"isPrivate"`
+	IsArchived bool                  `json:"isArchived"`
+	Scope      sdk.ConfigAccountType `json:"-"`
+	Login      string                `json:"-"`
 }
 
 type repoWithNameResult struct {

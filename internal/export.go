@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	easyjson "github.com/mailru/easyjson"
 	"github.com/pinpt/agent.next/sdk"
 	"github.com/pinpt/go-common/v10/datetime"
 )
@@ -446,7 +447,7 @@ func (g *GithubIntegration) fetchRepos(logger sdk.Logger, client sdk.GraphQLClie
 		for key, buf := range result {
 			if key == "rateLimit" {
 				var rl rateLimit
-				if err := json.Unmarshal(buf, &rl); err != nil {
+				if err := easyjson.Unmarshal(buf, &rl); err != nil {
 					return nil, err
 				}
 				if err := g.checkForRateLimit(logger, export, rl); err != nil {
@@ -454,7 +455,7 @@ func (g *GithubIntegration) fetchRepos(logger sdk.Logger, client sdk.GraphQLClie
 				}
 			} else {
 				var repo repository
-				if err := json.Unmarshal(buf, &repo); err != nil {
+				if err := easyjson.Unmarshal(buf, &repo); err != nil {
 					return nil, err
 				}
 				results = append(results, repo)
@@ -720,7 +721,6 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 			return err
 		}
 
-		// installRepoWebhookIfRequired(customerID string, state sdk.State, client sdk.HTTPClient, login string, integrationID string, repo string) error
 		repo := node.ToModel(customerID, integrationID, r.Login, r.IsPrivate, r.Scope)
 		previousRepos[node.Name] = repo // remember it
 		if err := pipe.Write(repo); err != nil {

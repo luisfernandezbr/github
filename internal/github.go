@@ -8,6 +8,7 @@ import (
 )
 
 // GithubIntegration is an integration for GitHub
+// easyjson:skip
 type GithubIntegration struct {
 	logger  sdk.Logger
 	config  sdk.Config
