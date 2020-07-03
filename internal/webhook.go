@@ -203,6 +203,7 @@ func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 		}
 	}
 	if object != nil {
+		sdk.LogDebug(g.logger, "sending webhook to pipe", "data", object.Stringify())
 		webhook.Pipe().Write(object)
 	}
 	return nil
