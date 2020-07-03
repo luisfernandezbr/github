@@ -2,32 +2,106 @@ package internal
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/google/go-github/v32/github"
 	"github.com/pinpt/agent.next/sdk"
 )
 
+type pullrequestTimelineItems struct {
+	Nodes []author
+}
+
 type pullrequest struct {
-	ID          string              `json:"id"`
-	Body        string              `json:"bodyHTML"`
-	URL         string              `json:"url"`
-	Closed      bool                `json:"closed"`
-	Draft       bool                `json:"draft"`
-	Locked      bool                `json:"locked"`
-	Merged      bool                `json:"merged"`
-	Number      int                 `json:"number"`
-	State       string              `json:"state"`
-	Title       string              `json:"title"`
-	CreatedAt   time.Time           `json:"createdAt"`
-	UpdatedAt   time.Time           `json:"updatedAt"`
-	MergedAt    time.Time           `json:"mergedAt"`
-	Author      author              `json:"author"`
-	Branch      string              `json:"branch"`
-	MergeCommit oidProp             `json:"mergeCommit"`
-	MergedBy    author              `json:"mergedBy"`
-	Commits     pullrequestcommits  `json:"commits"`
-	Reviews     pullrequestreviews  `json:"reviews"`
-	Comments    pullrequestcomments `json:"comments"`
+	ID            string                   `json:"id"`
+	Body          string                   `json:"bodyHTML"`
+	URL           string                   `json:"url"`
+	Closed        bool                     `json:"closed"`
+	Draft         bool                     `json:"draft"`
+	Locked        bool                     `json:"locked"`
+	Merged        bool                     `json:"merged"`
+	Number        int                      `json:"number"`
+	State         string                   `json:"state"`
+	Title         string                   `json:"title"`
+	CreatedAt     time.Time                `json:"createdAt"`
+	UpdatedAt     time.Time                `json:"updatedAt"`
+	MergedAt      time.Time                `json:"mergedAt"`
+	Author        author                   `json:"author"`
+	Branch        string                   `json:"branch"`
+	MergeCommit   oidProp                  `json:"mergeCommit"`
+	MergedBy      author                   `json:"mergedBy"`
+	Commits       pullrequestcommits       `json:"commits"`
+	Reviews       pullrequestreviews       `json:"reviews"`
+	Comments      pullrequestcomments      `json:"comments"`
+	TimelineItems pullrequestTimelineItems `json:"timelineItems"`
+}
+
+func userToAuthor(user *github.User) author {
+	var author author
+	if user.ID != nil {
+		author.ID = user.GetNodeID()
+	}
+	author.Avatar = user.GetAvatarURL()
+	author.Email = user.GetEmail()
+	author.Login = user.GetLogin()
+	author.Name = user.GetName()
+	author.URL = user.GetHTMLURL()
+	author.Type = "User"
+	return author
+}
+
+func (g *GithubIntegration) fromPullRequestEvent(logger sdk.Logger, client sdk.GraphQLClient, userManager *UserManager, control sdk.Control, customerID string, pr *github.PullRequestEvent) (*sdk.SourceCodePullRequest, error) {
+	var action string
+	if pr.Action != nil {
+		action = *pr.Action
+	}
+	switch action {
+	case "opened", "synchronize", "edited", "ready_for_review", "locked", "unlocked", "reopened", "closed", "converted_to_draft":
+		var object pullrequest
+		object.ID = *pr.PullRequest.NodeID
+		object.Body = *pr.PullRequest.Body // FIXME
+		object.URL = *pr.PullRequest.HTMLURL
+		if action == "closed" {
+			// If the action is "closed" and the "merged" key is "false", the pull request was closed with unmerged commits.
+			// If the action is "closed" and the "merged" key is "true", the pull request was merged.
+			object.Closed = true
+			object.TimelineItems = pullrequestTimelineItems{
+				Nodes: []author{userToAuthor(pr.Sender)},
+			}
+		}
+		object.Author = userToAuthor(pr.PullRequest.User)
+		object.Draft = *pr.PullRequest.Draft
+		object.Locked = *pr.PullRequest.Locked
+		object.Merged = *pr.PullRequest.Merged
+		object.Number = *pr.PullRequest.Number
+		object.State = strings.ToUpper(*pr.PullRequest.State)
+		object.Title = *pr.PullRequest.Title
+		object.CreatedAt = *pr.PullRequest.CreatedAt
+		if pr.PullRequest.UpdatedAt != nil {
+			object.UpdatedAt = *pr.PullRequest.UpdatedAt
+		}
+		if pr.PullRequest.MergedAt != nil {
+			object.MergedAt = *pr.PullRequest.MergedAt
+		}
+		// TODO: do the remaining fields
+		object.Branch = *pr.PullRequest.Head.Ref
+		object.MergeCommit = oidProp{*pr.PullRequest.Base.SHA}
+		repoID := sdk.NewSourceCodeRepoID(customerID, *pr.Repo.NodeID, refType)
+		result, err := object.ToModel(logger, userManager, customerID, *pr.Repo.FullName, repoID)
+		if err != nil {
+			return nil, err
+		}
+		commits, err := g.fetchPullRequestCommits(logger, client, userManager, control, customerID, *pr.Repo.FullName, *pr.PullRequest.NodeID, repoID, "")
+		if err != nil {
+			return nil, err
+		}
+		setPullRequestCommits(result, commits)
+		return result, nil
+	default:
+		sdk.LogInfo(logger, "unhandled pull request action: "+action)
+	}
+	return nil, nil
 }
 
 func setPullRequestCommits(pullrequest *sdk.SourceCodePullRequest, commits []*sdk.SourceCodePullRequestCommit) {
@@ -51,7 +125,7 @@ func setPullRequestCommits(pullrequest *sdk.SourceCodePullRequest, commits []*sd
 	}
 }
 
-func (pr pullrequest) ToModel(logger sdk.Logger, userManager *UserManager, customerID string, repoName string, repoID string) *sdk.SourceCodePullRequest {
+func (pr pullrequest) ToModel(logger sdk.Logger, userManager *UserManager, customerID string, repoName string, repoID string) (*sdk.SourceCodePullRequest, error) {
 	// FIXME: implement the remaining fields
 	pullrequest := &sdk.SourceCodePullRequest{}
 	pullrequest.ID = sdk.NewSourceCodePullRequestID(customerID, pr.ID, refType, repoID)
@@ -64,9 +138,11 @@ func (pr pullrequest) ToModel(logger sdk.Logger, userManager *UserManager, custo
 	pullrequest.Description = pr.Body
 	pullrequest.Draft = pr.Draft
 	pullrequest.CreatedByRefID = pr.Author.RefID(customerID)
-	userManager.emitAuthor(logger, pr.Author)
+	if err := userManager.emitAuthor(logger, pr.Author); err != nil {
+		return nil, err
+	}
 	pullrequest.BranchName = pr.Branch
-	pullrequest.IntegrationInstanceID = sdk.StringPointer(userManager.export.IntegrationID())
+	pullrequest.IntegrationInstanceID = sdk.StringPointer(userManager.instanceid)
 	pullrequest.Identifier = fmt.Sprintf("%s#%d", repoName, pr.Number)
 	if pr.Merged {
 		pullrequest.MergeSha = pr.MergeCommit.Oid
@@ -78,7 +154,9 @@ func (pr pullrequest) ToModel(logger sdk.Logger, userManager *UserManager, custo
 			Offset:  md.Offset,
 		}
 		pullrequest.MergedByRefID = pr.MergedBy.RefID(customerID)
-		userManager.emitAuthor(logger, pr.MergedBy)
+		if err := userManager.emitAuthor(logger, pr.MergedBy); err != nil {
+			return nil, err
+		}
 	}
 	cd, _ := sdk.NewDateWithTime(pr.CreatedAt)
 	pullrequest.CreatedDate = sdk.SourceCodePullRequestCreatedDate{
@@ -101,8 +179,12 @@ func (pr pullrequest) ToModel(logger sdk.Logger, userManager *UserManager, custo
 		}
 	case "CLOSED":
 		pullrequest.Status = sdk.SourceCodePullRequestStatusClosed
-		pullrequest.ClosedByRefID = "" // TODO
-		// userManager.emit(pr.Author)
+		if len(pr.TimelineItems.Nodes) > 0 {
+			if err := userManager.emitAuthor(logger, pr.TimelineItems.Nodes[0]); err != nil {
+				return nil, err
+			}
+			pullrequest.ClosedByRefID = pr.TimelineItems.Nodes[0].RefID(customerID)
+		}
 		pullrequest.ClosedDate = sdk.SourceCodePullRequestClosedDate{
 			Epoch:   ud.Epoch,
 			Rfc3339: ud.Rfc3339,
@@ -111,7 +193,7 @@ func (pr pullrequest) ToModel(logger sdk.Logger, userManager *UserManager, custo
 	case "MERGED":
 		pullrequest.Status = sdk.SourceCodePullRequestStatusMerged
 	}
-	return pullrequest
+	return pullrequest, nil
 }
 
 type repositoryPullrequests struct {

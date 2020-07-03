@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/google/go-github/v32/github"
 	"github.com/pinpt/agent.next/sdk"
 )
 
@@ -175,7 +176,34 @@ func (g *GithubIntegration) registerWebhook(customerID string, state sdk.State, 
 
 // WebHook is called when a webhook is received on behalf of the integration
 func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
-	// FIXME: implement this
-	sdk.LogInfo(g.logger, "webhook received", "payload", sdk.Stringify(webhook.Data()))
+	sdk.LogInfo(g.logger, "webhook received", "headers", webhook.Headers())
+	event := webhook.Headers()["x-github-event"]
+	obj, err := github.ParseWebHook(event, webhook.Bytes())
+	if err != nil {
+		return err
+	}
+	client := g.testClient
+	if client == nil {
+		_, cl, err := g.newGraphClient(g.logger, webhook.Config())
+		if err != nil {
+			return err
+		}
+		client = cl
+	}
+	var object sdk.Model
+	switch v := obj.(type) {
+	case *github.PullRequestEvent:
+		userManager := NewUserManager(webhook.CustomerID(), []string{*v.Repo.Owner.Login}, webhook, webhook.Pipe(), g, webhook.IntegrationInstanceID())
+		obj, err := g.fromPullRequestEvent(g.logger, client, userManager, webhook, webhook.CustomerID(), v)
+		if err != nil {
+			return err
+		}
+		if obj != nil {
+			object = obj
+		}
+	}
+	if object != nil {
+		webhook.Pipe().Write(object)
+	}
 	return nil
 }

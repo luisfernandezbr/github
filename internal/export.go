@@ -23,44 +23,44 @@ const (
 
 type job func(export sdk.Export, pipe sdk.Pipe) error
 
-func (g *GithubIntegration) checkForRetryableError(logger sdk.Logger, export sdk.Export, err error) bool {
+func (g *GithubIntegration) checkForRetryableError(logger sdk.Logger, control sdk.Control, err error) bool {
 	if strings.Contains(err.Error(), "Something went wrong while executing your query") || strings.Contains(err.Error(), "EOF") {
 		sdk.LogInfo(logger, "retryable error detected, will pause for about one minute", "err", err)
-		export.Paused(time.Now().Add(time.Minute))
+		control.Paused(time.Now().Add(time.Minute))
 		time.Sleep(time.Minute + time.Millisecond*time.Duration(rand.Int63n(500)))
-		export.Resumed()
+		control.Resumed()
 		sdk.LogInfo(logger, "retryable error resumed")
 		return true
 	}
 	return false
 }
 
-func (g *GithubIntegration) checkForAbuseDetection(logger sdk.Logger, export sdk.Export, err error) bool {
+func (g *GithubIntegration) checkForAbuseDetection(logger sdk.Logger, control sdk.Control, err error) bool {
 	// first check our retry-after since we get better resolution on how much to slow down
 	if ok, retry := sdk.IsRateLimitError(err); ok {
 		sdk.LogInfo(logger, "rate limit detected", "until", time.Now().Add(retry))
-		export.Paused(time.Now().Add(retry))
+		control.Paused(time.Now().Add(retry))
 		time.Sleep(retry)
-		export.Resumed()
+		control.Resumed()
 		sdk.LogInfo(logger, "rate limit wake up")
 		return true
 	}
 	if strings.Contains(err.Error(), "You have triggered an abuse detection mechanism") {
 		// we need to try and back off at least 1min + some randomized number of additional ms
 		sdk.LogInfo(logger, "abuse detection, will pause for about one minute")
-		export.Paused(time.Now().Add(time.Minute))
+		control.Paused(time.Now().Add(time.Minute))
 		time.Sleep(time.Minute + time.Millisecond*time.Duration(rand.Int63n(500)))
-		export.Resumed()
+		control.Resumed()
 		sdk.LogInfo(logger, "abuse detection resumed")
 		return true
 	}
 	return false
 }
 
-func (g *GithubIntegration) checkForRateLimit(logger sdk.Logger, export sdk.Export, rateLimit rateLimit) error {
+func (g *GithubIntegration) checkForRateLimit(logger sdk.Logger, control sdk.Control, rateLimit rateLimit) error {
 	// check for rate limit
 	if rateLimit.ShouldPause() {
-		if err := export.Paused(rateLimit.ResetAt); err != nil {
+		if err := control.Paused(rateLimit.ResetAt); err != nil {
 			return err
 		}
 		// pause until we are no longer rate limited
@@ -68,7 +68,7 @@ func (g *GithubIntegration) checkForRateLimit(logger sdk.Logger, export sdk.Expo
 		time.Sleep(time.Until(rateLimit.ResetAt))
 		sdk.LogInfo(logger, "rate limit wake up")
 		// send a resume now that we're no longer rate limited
-		if err := export.Resumed(); err != nil {
+		if err := control.Resumed(); err != nil {
 			return err
 		}
 	}
@@ -76,27 +76,28 @@ func (g *GithubIntegration) checkForRateLimit(logger sdk.Logger, export sdk.Expo
 	return nil
 }
 
-func (g *GithubIntegration) fetchPullRequestCommits(logger sdk.Logger, client sdk.GraphQLClient, userManager *UserManager, export sdk.Export, name string, pullRequestID string, repoID string, cursor string) ([]*sdk.SourceCodePullRequestCommit, error) {
+func (g *GithubIntegration) fetchPullRequestCommits(logger sdk.Logger, client sdk.GraphQLClient, userManager *UserManager, control sdk.Control, customerID string, name string, pullRequestID string, repoID string, cursor string) ([]*sdk.SourceCodePullRequestCommit, error) {
 	sdk.LogInfo(logger, "need to run a pull request paginated commits starting from "+cursor, "repo", name, "pullrequest_id", pullRequestID)
 	after := cursor
 	var variables = map[string]interface{}{
 		"first": defaultPullRequestCommitPageSize,
 		"id":    pullRequestID,
 	}
-	customerID := export.CustomerID()
 	var retryCount int
 	commits := make([]*sdk.SourceCodePullRequestCommit, 0)
 	for {
-		variables["after"] = after
+		if after != "" {
+			variables["after"] = after
+		}
 		sdk.LogDebug(logger, "running queued pullrequests export", "repo", name, "after", after, "limit", variables["first"], "retryCount", retryCount)
 		var result pullrequestPagedCommitsResult
 		g.lock.Lock() // just to prevent too many GH requests
 		if err := client.Query(generateAllPRCommitsQuery("", after), variables, &result); err != nil {
 			g.lock.Unlock()
-			if g.checkForAbuseDetection(logger, export, err) {
+			if g.checkForAbuseDetection(logger, control, err) {
 				continue
 			}
-			if g.checkForRetryableError(logger, export, err) {
+			if g.checkForRetryableError(logger, control, err) {
 				retryCount++
 				variables["first"] = defaultRetryPageSize // back off the page size to see if this will help
 				if retryCount >= 10 {
@@ -115,7 +116,7 @@ func (g *GithubIntegration) fetchPullRequestCommits(logger sdk.Logger, client sd
 			}
 			commits = append(commits, prcommit)
 		}
-		if err := g.checkForRateLimit(logger, export, result.RateLimit); err != nil {
+		if err := g.checkForRateLimit(logger, control, result.RateLimit); err != nil {
 			return nil, err
 		}
 		if !result.Node.PageInfo.HasNextPage {
@@ -160,7 +161,10 @@ func (g *GithubIntegration) queuePullRequestJob(logger sdk.Logger, client sdk.Gr
 			g.lock.Unlock()
 			retryCount = 0
 			for _, predge := range result.Repository.Pullrequests.Edges {
-				pullrequest := predge.Node.ToModel(logger, userManager, customerID, fullname, repoID)
+				pullrequest, err := predge.Node.ToModel(logger, userManager, customerID, fullname, repoID)
+				if err != nil {
+					return fmt.Errorf("failed to convert pull request to model: %w", err)
+				}
 				for _, reviewedge := range predge.Node.Reviews.Edges {
 					prreview, err := reviewedge.Node.ToModel(logger, userManager, customerID, repoID, pullrequest.ID)
 					if err != nil {
@@ -186,7 +190,7 @@ func (g *GithubIntegration) queuePullRequestJob(logger sdk.Logger, client sdk.Gr
 				}
 				if predge.Node.Commits.PageInfo.HasNextPage {
 					// fetch all the remaining paged commits
-					morecommits, err := g.fetchPullRequestCommits(logger, client, userManager, export, fullname, predge.Node.ID, pullrequest.RepoID, predge.Node.Commits.PageInfo.EndCursor)
+					morecommits, err := g.fetchPullRequestCommits(logger, client, userManager, export, customerID, fullname, predge.Node.ID, pullrequest.RepoID, predge.Node.Commits.PageInfo.EndCursor)
 					if err != nil {
 						return err
 					}
@@ -670,8 +674,8 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 	}
 
 	customerID := export.CustomerID()
-	integrationID := export.IntegrationID()
-	userManager := NewUserManager(customerID, orgs, export, pipe, g, client)
+	instanceID := export.IntegrationInstanceID()
+	userManager := NewUserManager(customerID, orgs, export, pipe, g, instanceID)
 	jobs := make([]job, 0)
 	started := time.Now()
 	state := export.State()
@@ -706,7 +710,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 				}
 				// remove the webhook
 				r := repos[repo.Name]
-				g.uninstallRepoWebhook(state, httpclient, r.Login, integrationID, repo.Name)
+				g.uninstallRepoWebhook(state, httpclient, r.Login, instanceID, repo.Name)
 			}
 		}
 	}
@@ -717,17 +721,20 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 		repoCount++
 		r := repos[node.Name]
 
-		if err := g.installRepoWebhookIfRequired(customerID, logger, state, httpclient, r.Login, integrationID, node.Name); err != nil {
+		if err := g.installRepoWebhookIfRequired(customerID, logger, state, httpclient, r.Login, instanceID, node.Name); err != nil {
 			return err
 		}
 
-		repo := node.ToModel(customerID, integrationID, r.Login, r.IsPrivate, r.Scope)
+		repo := node.ToModel(customerID, instanceID, r.Login, r.IsPrivate, r.Scope)
 		previousRepos[node.Name] = repo // remember it
 		if err := pipe.Write(repo); err != nil {
 			return err
 		}
 		for _, predge := range node.Pullrequests.Edges {
-			pullrequest := predge.Node.ToModel(logger, userManager, customerID, repo.Name, repo.ID)
+			pullrequest, err := predge.Node.ToModel(logger, userManager, customerID, repo.Name, repo.ID)
+			if err != nil {
+				return fmt.Errorf("failed to convert pull request to model: %w", err)
+			}
 			for _, reviewedge := range predge.Node.Reviews.Edges {
 				prreview, err := reviewedge.Node.ToModel(logger, userManager, customerID, repo.ID, pullrequest.ID)
 				if err != nil {
@@ -764,7 +771,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 			}
 			if predge.Node.Commits.PageInfo.HasNextPage {
 				// fetch all the remaining paged commits
-				morecommits, err := g.fetchPullRequestCommits(logger, client, userManager, export, repo.Name, predge.Node.ID, pullrequest.RepoID, predge.Node.Commits.PageInfo.EndCursor)
+				morecommits, err := g.fetchPullRequestCommits(logger, client, userManager, export, customerID, repo.Name, predge.Node.ID, pullrequest.RepoID, predge.Node.Commits.PageInfo.EndCursor)
 				if err != nil {
 					return fmt.Errorf("error fetching commits for pull request %s for repo: %v. %w", pullrequest.ID, r.Name, err)
 				}

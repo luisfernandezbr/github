@@ -35,7 +35,145 @@ type oidProp struct {
 	Oid string `json:"oid"`
 }
 
-var pullrequestPagedQuery = `
+var pullrequestFields = `
+	id
+	bodyHTML
+	url
+	closed
+	draft: isDraft
+	locked
+	merged
+	number
+	state
+	title
+	createdAt
+	updatedAt
+	mergedAt
+	branch: headRefName
+	mergeCommit {
+		oid
+	}
+	mergedBy {
+		type: __typename
+		avatarUrl
+		login
+		url
+		...on User {
+			id
+			email
+			name
+		}
+	}
+	author {
+		type: __typename
+		avatarUrl
+		login
+		url
+		...on User {
+			id
+			email
+			name
+		}
+	}
+	commits(first: 10) {
+		totalCount
+		pageInfo {
+			hasNextPage
+			startCursor
+			endCursor
+		}
+		edges {
+			cursor
+			node {
+				commit {
+					sha: oid
+					message
+					authoredDate
+					additions
+					deletions
+					url
+					author {
+						avatarUrl
+						email
+						name
+						user {
+							id
+							login
+						}
+					}
+					committer {
+						avatarUrl
+						email
+						name
+						user {
+							id
+							login
+						}
+					}
+				}
+			}
+		}
+	}
+	reviews(first: 10) {
+		totalCount
+		pageInfo {
+			hasNextPage
+			startCursor
+			endCursor
+		}
+		edges {
+			cursor
+			node {
+				id
+				state
+				createdAt
+				url
+				author {
+					type: __typename
+					avatarUrl
+					login
+					url
+					...on User {
+						id
+						email
+						name
+					}
+				}
+			}
+		}
+	}
+	comments(first: 10) {
+		totalCount
+		pageInfo {
+			hasNextPage
+			startCursor
+			endCursor
+		}
+		edges {
+			cursor
+			node {
+				id
+				createdAt
+				updatedAt
+				url
+				bodyHTML
+				author {
+					type: __typename
+					avatarUrl
+					login
+					url
+					...on User {
+						id
+						email
+						name
+					}
+				}
+			}
+		}
+	}
+`
+
+var pullrequestPagedQuery = fmt.Sprintf(`
 query GetPullRequests($name: String!, $owner: String!, $first: Int!, $after: String) {
 	repository(name: $name, owner: $owner) {
 		pullRequests(first: $first, after: $after, orderBy: {field: UPDATED_AT, direction: DESC}) {
@@ -48,141 +186,7 @@ query GetPullRequests($name: String!, $owner: String!, $first: Int!, $after: Str
 			edges {
 				cursor
 				node {
-					id
-					bodyHTML
-					url
-					closed
-					draft: isDraft
-					locked
-					merged
-					number
-					state
-					title
-					createdAt
-					updatedAt
-					mergedAt
-					branch: headRefName
-					mergeCommit {
-						oid
-					}
-					mergedBy {
-						type: __typename
-						avatarUrl
-						login
-						url
-						...on User {
-							id
-							email
-							name
-						}
-					}
-					author {
-						type: __typename
-						avatarUrl
-						login
-						url
-						...on User {
-							id
-							email
-							name
-						}
-					}
-					commits(first: 10) {
-						totalCount
-						pageInfo {
-							hasNextPage
-							startCursor
-							endCursor
-						}
-						edges {
-							cursor
-							node {
-								commit {
-									sha: oid
-									message
-									authoredDate
-									additions
-									deletions
-									url
-									author {
-										avatarUrl
-										email
-										name
-										user {
-											id
-											login
-										}
-									}
-									committer {
-										avatarUrl
-										email
-										name
-										user {
-											id
-											login
-										}
-									}
-								}
-							}
-						}
-					}
-					reviews(first: 10) {
-						totalCount
-						pageInfo {
-							hasNextPage
-							startCursor
-							endCursor
-						}
-						edges {
-							cursor
-							node {
-								id
-								state
-								createdAt
-								url
-								author {
-									type: __typename
-									avatarUrl
-									login
-									url
-									...on User {
-										id
-										email
-										name
-									}
-								}
-							}
-						}
-					}
-					comments(first: 10) {
-						totalCount
-						pageInfo {
-							hasNextPage
-							startCursor
-							endCursor
-						}
-						edges {
-							cursor
-							node {
-								id
-								createdAt
-								updatedAt
-								url
-								bodyHTML
-								author {
-									type: __typename
-									avatarUrl
-									login
-									url
-									...on User {
-										id
-										email
-										name
-									}
-								}
-							}
-						}
-					}
+					%s
 				}
 			}
 		}
@@ -194,7 +198,7 @@ query GetPullRequests($name: String!, $owner: String!, $first: Int!, $after: Str
 		resetAt
 	}
 }
-`
+`, pullrequestFields)
 
 var pullrequestCommentsPagedQuery = `
 query GetPullRequestComments($name: String!, $owner: String!, $first: Int!, $after: String, $number: Int!) {
@@ -521,6 +525,23 @@ func getAllRepoDataQuery(owner, name, label, cursor string) string {
 							id
 							email
 							name
+						}
+					}
+					timelineItems(last: 1, itemTypes: CLOSED_EVENT) {
+						nodes {
+							... on ClosedEvent {
+								actor {
+									type: __typename
+									avatarUrl
+									login
+									url
+									... on User {
+										id
+										email
+										name
+									}
+								}
+							}
 						}
 					}
 					commits(first: 10) {

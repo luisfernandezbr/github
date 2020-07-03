@@ -40,7 +40,7 @@ func (r pullrequestreview) ToModel(logger sdk.Logger, userManager *UserManager, 
 		Rfc3339: cd.Rfc3339,
 		Offset:  cd.Offset,
 	}
-	prreview.IntegrationInstanceID = sdk.StringPointer(userManager.export.IntegrationID())
+	prreview.IntegrationInstanceID = sdk.StringPointer(userManager.instanceid)
 	switch r.State {
 	case "PENDING":
 		prreview.State = sdk.SourceCodePullRequestReviewStatePending

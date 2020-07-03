@@ -73,7 +73,6 @@ type gitUser struct {
 }
 
 func (a gitUser) RefID(customerID string) string {
-	// FIXME
 	if a.User.ID != "" {
 		return a.User.ID
 	}

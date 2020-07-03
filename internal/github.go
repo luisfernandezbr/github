@@ -14,6 +14,8 @@ type GithubIntegration struct {
 	config  sdk.Config
 	manager sdk.Manager
 	lock    sync.Mutex
+
+	testClient sdk.GraphQLClient // only set in testing
 }
 
 var _ sdk.Integration = (*GithubIntegration)(nil)
@@ -39,7 +41,7 @@ func (g *GithubIntegration) Enroll(instance sdk.Instance) error {
 		}
 		for login, acct := range *config.Accounts {
 			if acct.Type == sdk.ConfigAccountTypeOrg {
-				if err := g.registerWebhook(instance.CustomerID(), state, client, login, instance.IntegrationID(), "/orgs/"+login+"/hooks"); err != nil {
+				if err := g.registerWebhook(instance.CustomerID(), state, client, login, instance.IntegrationInstanceID(), "/orgs/"+login+"/hooks"); err != nil {
 					return fmt.Errorf("error creating webhook. %w", err)
 				}
 			}
@@ -58,7 +60,7 @@ func (g *GithubIntegration) Dismiss(instance sdk.Instance) error {
 		}
 		for login, acct := range *config.Accounts {
 			if acct.Type == sdk.ConfigAccountTypeOrg {
-				if err := g.unregisterWebhook(instance.State(), client, login, instance.IntegrationID(), "/orgs/"+login+"/hooks"); err != nil {
+				if err := g.unregisterWebhook(instance.State(), client, login, instance.IntegrationInstanceID(), "/orgs/"+login+"/hooks"); err != nil {
 					sdk.LogError(g.logger, "error unregistering webhook", "login", login, "err", err)
 				}
 			}
