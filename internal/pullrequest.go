@@ -196,6 +196,37 @@ func (pr pullrequest) ToModel(logger sdk.Logger, userManager *UserManager, custo
 	return pullrequest, nil
 }
 
+func (g *GithubIntegration) updatePullrequest(logger sdk.Logger, config sdk.Config, id string, partial *sdk.SourceCodePullRequestPartial, user sdk.MutationUser) error {
+	payload := make(map[string]interface{})
+	if partial.Title != nil {
+		payload["title"] = *partial.Title
+	}
+	if partial.Description != nil {
+		payload["body"] = *partial.Description
+	}
+	if partial.Status != nil {
+		payload["state"] = *partial.Status
+	}
+	if len(payload) == 0 {
+		return fmt.Errorf("the mutation failed because invalid value was passed: %s", sdk.Stringify(partial))
+	}
+	payload["pullRequestId"] = id
+	var c sdk.Config // copy in the config for the user
+	c.APIKeyAuth = user.APIKeyAuth
+	c.BasicAuth = user.BasicAuth
+	c.OAuth2Auth = user.OAuth2Auth
+	_, client, err := g.newGraphClient(logger, c)
+	if err != nil {
+		return fmt.Errorf("error creating http client: %w", err)
+	}
+	var resp mutationResponse
+	sdk.LogDebug(logger, "sending pull request mutation", "input", payload, "user", user.ID)
+	if err := client.Query(pullRequestUpdateMutation, map[string]interface{}{"input": payload}, &resp); err != nil {
+		return err
+	}
+	return nil
+}
+
 type repositoryPullrequests struct {
 	Repository repository `json:"repository"`
 	RateLimit  rateLimit  `json:"rateLimit"`

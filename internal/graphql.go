@@ -645,3 +645,15 @@ func getAllRepoDataQuery(owner, name, label, cursor string) string {
 		}
 	}`, label, name, owner, cursorVal)
 }
+
+type mutationResponse struct {
+	ID int `json:"clientMutationId"`
+}
+
+var pullRequestUpdateMutation = `
+mutation updatePullrequest($input: UpdatePullRequestInput!) {
+	updatePullRequest(input: $input) {
+		clientMutationId
+	}
+}
+`

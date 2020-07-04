@@ -9,6 +9,10 @@ capabilities:
   - sourcecode.PullRequestReview
   - sourcecode.PullRequestCommit
   - sourcecode.PullRequestComment
+  - agent.Mutation
+  - web.Hook
+  - auth.OAuth2
+  - auth.BasicAuth
 installation:
   modes:
     - cloud
@@ -17,6 +21,3 @@ installation:
     network:
       hostnames:
         - "api.github.com"
-    capabilities:
-      - web.Hook
-      - auth.OAuth2
