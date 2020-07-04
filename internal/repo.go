@@ -29,7 +29,7 @@ type repository struct {
 func (g *GithubIntegration) fromRepositoryEvent(logger sdk.Logger, integrationInstanceID string, customerID string, event *github.RepositoryEvent) (*sdk.SourceCodeRepo, *sdk.WorkProject) {
 	var repo repository
 	theRepo := event.GetRepo()
-	login := theRepo.Owner.GetLogin()
+	login := getRepoOwnerLogin(theRepo)
 	var scope sdk.ConfigAccountType
 	if theRepo.Owner.GetType() == "Organization" {
 		scope = sdk.ConfigAccountTypeOrg
