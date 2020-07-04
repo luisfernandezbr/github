@@ -27,27 +27,28 @@ func (g *GithubIntegration) isOrgWebHookInstalled(state sdk.State, login string)
 	return state.Exists(key)
 }
 
-func (g *GithubIntegration) installRepoWebhookIfRequired(customerID string, logger sdk.Logger, state sdk.State, client sdk.HTTPClient, login string, integrationInstanceID string, repo string) error {
-	if g.isOrgWebHookInstalled(state, login) {
-		return nil
+func (g *GithubIntegration) isWebHookInstalledForRepo(state sdk.State, customerID, integrationInstanceID, orgLogin, repoName string) bool {
+	if g.isOrgWebHookInstalled(state, orgLogin) {
+		return true
 	}
-	key := repoWebhookInstalledStateKeyPrefix + integrationInstanceID + "_" + repo
+	key := repoWebhookInstalledStateKeyPrefix + integrationInstanceID + "_" + repoName
 	var id int64
-	found, err := state.Get(key, &id)
-	if err != nil {
-		return fmt.Errorf("error fetching webhook state key: %w", err)
-	}
-	if found {
-		sdk.LogInfo(logger, "webhook already exists for this repo", "name", repo, "integration_id", integrationInstanceID)
-		return nil
+	found, _ := state.Get(key, &id)
+	return found
+}
+
+func (g *GithubIntegration) installRepoWebhookIfRequired(customerID string, logger sdk.Logger, state sdk.State, client sdk.HTTPClient, login string, integrationInstanceID string, repo string) (bool, error) {
+	if g.isWebHookInstalledForRepo(state, customerID, integrationInstanceID, login, repo) {
+		sdk.LogDebug(logger, "webhook is already enabled for this repo", "repo", repo, "org", login)
+		return true, nil
 	}
 	url, err := g.manager.CreateWebHook(customerID, refType, integrationInstanceID, login)
 	if err != nil {
 		if err.Error() == "webhook: disabled" {
 			sdk.LogInfo(logger, "webhooks are disabled in dev mode")
-			return nil // this is ok, just in dev mode disabled
+			return false, nil // this is ok, just in dev mode disabled
 		}
-		return fmt.Errorf("error creating webhook url for %s: %w", login, err)
+		return false, fmt.Errorf("error creating webhook url for %s: %w", login, err)
 	}
 	// need to try and install
 	params := map[string]interface{}{
@@ -66,17 +67,18 @@ func (g *GithubIntegration) installRepoWebhookIfRequired(customerID string, logg
 	if err != nil {
 		if err.Error() == "HTTP Error: 404" {
 			sdk.LogInfo(logger, "not authorized to create webhooks for repo", "login", login, "repo", repo)
-			return nil
+			return false, nil
 		}
-		return fmt.Errorf("error creating webhook for %s: %w", login, err)
+		return false, fmt.Errorf("error creating webhook for %s: %w", login, err)
 	}
 	if resp.StatusCode == http.StatusCreated {
+		key := repoWebhookInstalledStateKeyPrefix + integrationInstanceID + "_" + repo
 		if err := state.Set(key, kv["id"]); err != nil {
-			return fmt.Errorf("error saving repo %s webhook url to state: %w", repo, err)
+			return false, fmt.Errorf("error saving repo %s webhook url to state: %w", repo, err)
 		}
-		return nil
+		return false, nil // return false just indicating it wasn't already installed
 	}
-	return fmt.Errorf("error saving repo %s webhook url, expected 201 status code but received %v", repo, resp.StatusCode)
+	return false, fmt.Errorf("error saving repo %s webhook url, expected 201 status code but received %v", repo, resp.StatusCode)
 }
 
 func (g *GithubIntegration) uninstallRepoWebhook(state sdk.State, client sdk.HTTPClient, login string, integrationInstanceID string, repo string) {
@@ -176,8 +178,8 @@ func (g *GithubIntegration) registerWebhook(customerID string, state sdk.State, 
 
 // WebHook is called when a webhook is received on behalf of the integration
 func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
-	sdk.LogInfo(g.logger, "webhook received", "headers", webhook.Headers())
 	event := webhook.Headers()["x-github-event"]
+	sdk.LogInfo(g.logger, "webhook received", "headers", webhook.Headers(), "event", event)
 	obj, err := github.ParseWebHook(event, webhook.Bytes())
 	if err != nil {
 		return err
@@ -205,6 +207,36 @@ func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 	case *github.PullRequestEvent:
 		userManager := NewUserManager(webhook.CustomerID(), []string{*v.Repo.Owner.Login}, webhook, webhook.Pipe(), g, webhook.IntegrationInstanceID())
 		obj, err := g.fromPullRequestEvent(g.logger, client, userManager, webhook, webhook.CustomerID(), v)
+		if err != nil {
+			return err
+		}
+		if obj != nil {
+			objects = []sdk.Model{obj}
+		}
+	case *github.PullRequestReviewEvent:
+		userManager := NewUserManager(webhook.CustomerID(), []string{*v.Repo.Owner.Login}, webhook, webhook.Pipe(), g, webhook.IntegrationInstanceID())
+		obj, err := g.fromPullRequestReviewEvent(g.logger, client, userManager, webhook, webhook.CustomerID(), v)
+		if err != nil {
+			return err
+		}
+		if obj != nil {
+			objects = []sdk.Model{obj}
+		}
+	case *github.IssueCommentEvent:
+		if isIssueCommentPR(v) {
+			userManager := NewUserManager(webhook.CustomerID(), []string{*v.Repo.Owner.Login}, webhook, webhook.Pipe(), g, webhook.IntegrationInstanceID())
+			obj, err := g.fromPullRequestCommentEvent(g.logger, client, userManager, webhook, webhook.CustomerID(), v)
+			if err != nil {
+				return err
+			}
+			if obj != nil {
+				objects = []sdk.Model{obj}
+			}
+		} else {
+			// TODO: issue comments
+		}
+	case *github.RepositoryEvent:
+		obj := g.fromRepositoryEvent(g.logger, webhook.IntegrationInstanceID(), webhook.CustomerID(), v)
 		if err != nil {
 			return err
 		}

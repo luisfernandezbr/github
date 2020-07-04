@@ -3,6 +3,7 @@ package internal
 import (
 	"time"
 
+	"github.com/google/go-github/v32/github"
 	"github.com/pinpt/agent.next/sdk"
 )
 
@@ -23,6 +24,19 @@ type pullrequestreview struct {
 	CreatedAt time.Time `json:"createdAt"`
 	Author    author    `json:"author"`
 	URL       string    `json:"url"`
+}
+
+func (g *GithubIntegration) fromPullRequestReviewEvent(logger sdk.Logger, client sdk.GraphQLClient, userManager *UserManager, control sdk.Control, customerID string, prEvent *github.PullRequestReviewEvent) (*sdk.SourceCodePullRequestReview, error) {
+	var review pullrequestreview
+	theReview := prEvent.GetReview()
+	review.ID = theReview.GetNodeID()
+	review.State = theReview.GetState()
+	review.CreatedAt = theReview.GetSubmittedAt()
+	review.Author = userToAuthor(theReview.GetUser())
+	review.URL = theReview.GetHTMLURL()
+	repoID := sdk.NewSourceCodeRepoID(customerID, prEvent.Repo.GetNodeID(), refType)
+	prID := sdk.NewSourceCodePullRequestID(customerID, prEvent.PullRequest.GetNodeID(), refType, repoID)
+	return review.ToModel(logger, userManager, customerID, repoID, prID)
 }
 
 func (r pullrequestreview) ToModel(logger sdk.Logger, userManager *UserManager, customerID string, repoID string, prID string) (*sdk.SourceCodePullRequestReview, error) {

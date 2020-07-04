@@ -721,8 +721,14 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 		repoCount++
 		r := repos[node.Name]
 
-		if err := g.installRepoWebhookIfRequired(customerID, logger, state, httpclient, r.Login, instanceID, node.Name); err != nil {
+		hookInstalled, err := g.installRepoWebhookIfRequired(customerID, logger, state, httpclient, r.Login, instanceID, node.Name)
+		if err != nil {
 			return err
+		}
+		if hookInstalled && !export.Historical() {
+			// if the hook is installed this isn't a historical, we can skip processing this repo
+			sdk.LogDebug(logger, "skipping repo since a webhook is already installed and not historical", "name", node.Name, "id", node.ID)
+			continue
 		}
 
 		repo := node.ToModel(customerID, instanceID, r.Login, r.IsPrivate, r.Scope)

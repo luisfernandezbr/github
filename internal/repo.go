@@ -3,6 +3,7 @@ package internal
 import (
 	"time"
 
+	"github.com/google/go-github/v32/github"
 	"github.com/pinpt/agent.next/sdk"
 )
 
@@ -20,6 +21,30 @@ type repository struct {
 	Owner         struct {
 		Login string `json:"login"`
 	} `json:"owner"`
+}
+
+func (g *GithubIntegration) fromRepositoryEvent(logger sdk.Logger, integrationInstanceID string, customerID string, event *github.RepositoryEvent) *sdk.SourceCodeRepo {
+	var repo repository
+	theRepo := event.GetRepo()
+	login := theRepo.Owner.GetLogin()
+	var scope sdk.ConfigAccountType
+	if theRepo.Owner.GetType() == "Organization" {
+		scope = sdk.ConfigAccountTypeOrg
+	} else {
+		scope = sdk.ConfigAccountTypeUser
+	}
+	repo.ID = theRepo.GetNodeID()
+	repo.Name = theRepo.GetFullName()
+	repo.URL = theRepo.GetHTMLURL()
+	repo.UpdatedAt = theRepo.UpdatedAt.Time
+	repo.Description = theRepo.GetDescription()
+	repo.Language = nameProp{theRepo.GetLanguage()}
+	repo.DefaultBranch = nameProp{theRepo.GetDefaultBranch()}
+	repo.IsArchived = theRepo.GetArchived()
+	repo.IsFork = theRepo.GetFork()
+	repo.Owner.Login = login
+	isPrivate := theRepo.GetPrivate()
+	return repo.ToModel(customerID, integrationInstanceID, login, isPrivate, scope)
 }
 
 func (r repository) ToModel(customerID string, integrationInstanceID string, login string, isPrivate bool, scope sdk.ConfigAccountType) *sdk.SourceCodeRepo {

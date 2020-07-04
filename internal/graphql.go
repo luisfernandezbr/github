@@ -646,6 +646,15 @@ func getAllRepoDataQuery(owner, name, label, cursor string) string {
 	}`, label, name, owner, cursorVal)
 }
 
+var pullrequestNodeIDQuery = `
+query getPRNodeID($name: String!, $owner: String!, $number: Int!) { 
+	repository(name: $name owner: $owner){
+	  pullRequest(number:$number) {
+		 id
+	  }
+	}
+}`
+
 type mutationResponse struct {
 	ID int `json:"clientMutationId"`
 }

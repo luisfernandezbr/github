@@ -49,7 +49,6 @@ func (g *GithubIntegration) fromPullRequestEvent(logger sdk.Logger, client sdk.G
 		object.ID = *pr.PullRequest.NodeID
 		if pr.PullRequest.Body != nil {
 			object.Body = toHTML(*pr.PullRequest.Body)
-			fmt.Println(object.Body)
 		}
 		object.URL = *pr.PullRequest.HTMLURL
 		if action == "closed" {
