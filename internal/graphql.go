@@ -738,6 +738,9 @@ query getIssues($name: String!, $owner: String!, $before: String, $after: String
 			body
 			closed
 			number
+			milestone {
+				id
+			}
 			labels(first: 20, orderBy: {field: CREATED_AT, direction: ASC}) {
 				nodes {
 				  id
@@ -825,6 +828,51 @@ query getBoardIssues($name: String!, $owner: String!, $num: Int!) {
 								id
 							}
 						}
+					}
+				}
+			}
+		}
+	}
+}
+`
+
+var repositoryMilestonesQuery = `
+query getMilestones($name: String!, $owner: String!, $before: String, $after: String) {
+	rateLimit {
+		limit
+		cost
+		remaining
+		resetAt
+	}
+	repository(name: $name, owner: $owner) {
+		milestones(first:100, before:$before, after:$after, orderBy:{field:UPDATED_AT, direction:DESC}) {
+			totalCount
+			pageInfo {
+				hasNextPage
+				startCursor
+				endCursor
+			}
+		 	nodes {
+				id
+				title
+				number
+				description
+				url
+				closed
+				createdAt
+				updatedAt
+				closedAt
+				dueOn
+				state
+				creator {
+					type: __typename
+					avatarUrl
+					login
+					url
+					... on User {
+						id
+						email
+						name
 					}
 				}
 			}

@@ -192,11 +192,11 @@ func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 		}
 		client = cl
 	}
-	// TODO: we should probably hash users in state so we don't emit each time we do something
 	var objects []sdk.Model
 	switch v := obj.(type) {
 	case *github.PushEvent:
-		userManager := NewUserManager(webhook.CustomerID(), []string{*v.Repo.Owner.Login}, webhook, webhook.State(), webhook.Pipe(), g, webhook.IntegrationInstanceID(), false)
+		repoLogin := getPushRepoOwnerLogin(v.Repo)
+		userManager := NewUserManager(webhook.CustomerID(), []string{repoLogin}, webhook, webhook.State(), webhook.Pipe(), g, webhook.IntegrationInstanceID(), false)
 		commits, err := g.fromPushEvent(g.logger, client, userManager, webhook, webhook.CustomerID(), v)
 		if err != nil {
 			return err
@@ -205,7 +205,8 @@ func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 			objects = append(objects, commit)
 		}
 	case *github.PullRequestEvent:
-		userManager := NewUserManager(webhook.CustomerID(), []string{*v.Repo.Owner.Login}, webhook, webhook.State(), webhook.Pipe(), g, webhook.IntegrationInstanceID(), false)
+		repoLogin := getRepoOwnerLogin(v.Repo)
+		userManager := NewUserManager(webhook.CustomerID(), []string{repoLogin}, webhook, webhook.State(), webhook.Pipe(), g, webhook.IntegrationInstanceID(), false)
 		obj, err := g.fromPullRequestEvent(g.logger, client, userManager, webhook, webhook.CustomerID(), v)
 		if err != nil {
 			return err
@@ -214,7 +215,8 @@ func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 			objects = []sdk.Model{obj}
 		}
 	case *github.PullRequestReviewEvent:
-		userManager := NewUserManager(webhook.CustomerID(), []string{*v.Repo.Owner.Login}, webhook, webhook.State(), webhook.Pipe(), g, webhook.IntegrationInstanceID(), false)
+		repoLogin := getRepoOwnerLogin(v.Repo)
+		userManager := NewUserManager(webhook.CustomerID(), []string{repoLogin}, webhook, webhook.State(), webhook.Pipe(), g, webhook.IntegrationInstanceID(), false)
 		obj, err := g.fromPullRequestReviewEvent(g.logger, client, userManager, webhook, webhook.CustomerID(), v)
 		if err != nil {
 			return err
@@ -223,8 +225,9 @@ func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 			objects = []sdk.Model{obj}
 		}
 	case *github.IssueCommentEvent:
+		repoLogin := getRepoOwnerLogin(v.Repo)
 		if isIssueCommentPR(v) {
-			userManager := NewUserManager(webhook.CustomerID(), []string{*v.Repo.Owner.Login}, webhook, webhook.State(), webhook.Pipe(), g, webhook.IntegrationInstanceID(), false)
+			userManager := NewUserManager(webhook.CustomerID(), []string{repoLogin}, webhook, webhook.State(), webhook.Pipe(), g, webhook.IntegrationInstanceID(), false)
 			obj, err := g.fromPullRequestCommentEvent(g.logger, client, userManager, webhook, webhook.CustomerID(), v)
 			if err != nil {
 				return err
@@ -233,7 +236,7 @@ func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 				objects = []sdk.Model{obj}
 			}
 		} else {
-			userManager := NewUserManager(webhook.CustomerID(), []string{*v.Repo.Owner.Login}, webhook, webhook.State(), webhook.Pipe(), g, webhook.IntegrationInstanceID(), false)
+			userManager := NewUserManager(webhook.CustomerID(), []string{repoLogin}, webhook, webhook.State(), webhook.Pipe(), g, webhook.IntegrationInstanceID(), false)
 			obj, err := g.fromIssueCommentEvent(g.logger, client, userManager, webhook, webhook.CustomerID(), webhook.IntegrationInstanceID(), v)
 			if err != nil {
 				return err
@@ -254,7 +257,8 @@ func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 			}
 		}
 	case *github.IssuesEvent:
-		userManager := NewUserManager(webhook.CustomerID(), []string{*v.Repo.Owner.Login}, webhook, webhook.State(), webhook.Pipe(), g, webhook.IntegrationInstanceID(), false)
+		repoLogin := getRepoOwnerLogin(v.Repo)
+		userManager := NewUserManager(webhook.CustomerID(), []string{repoLogin}, webhook, webhook.State(), webhook.Pipe(), g, webhook.IntegrationInstanceID(), false)
 		issue, err := g.fromIssueEvent(g.logger, userManager, webhook.IntegrationInstanceID(), webhook.CustomerID(), v)
 		if err != nil {
 			return err
@@ -263,12 +267,25 @@ func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 			objects = []sdk.Model{issue}
 		}
 	case *github.ProjectEvent:
-		return g.fetchRepoProject(g.logger, client, webhook.Pipe(), webhook, webhook.CustomerID(), webhook.IntegrationInstanceID(), v.Repo.Owner.GetLogin(), v.Repo.GetName(), v.Repo.GetNodeID(), v.Project.GetNumber())
+		repoLogin := getRepoOwnerLogin(v.Repo)
+		return g.fetchRepoProject(g.logger, client, webhook.Pipe(), webhook, webhook.CustomerID(), webhook.IntegrationInstanceID(), repoLogin, v.Repo.GetName(), v.Repo.GetNodeID(), v.Project.GetNumber())
 	case *github.ProjectCardEvent:
-		return g.fetchRepoProject(g.logger, client, webhook.Pipe(), webhook, webhook.CustomerID(), webhook.IntegrationInstanceID(), v.Repo.Owner.GetLogin(), v.Repo.GetName(), v.Repo.GetNodeID(), int(v.GetProjectCard().GetProjectID()))
+		repoLogin := getRepoOwnerLogin(v.Repo)
+		return g.fetchRepoProject(g.logger, client, webhook.Pipe(), webhook, webhook.CustomerID(), webhook.IntegrationInstanceID(), repoLogin, v.Repo.GetName(), v.Repo.GetNodeID(), int(v.GetProjectCard().GetProjectID()))
 	case *github.ProjectColumnEvent:
+		repoLogin := getRepoOwnerLogin(v.Repo)
 		num := getProjectIDfromURL(v.ProjectColumn.GetProjectURL())
-		return g.fetchRepoProject(g.logger, client, webhook.Pipe(), webhook, webhook.CustomerID(), webhook.IntegrationInstanceID(), v.Repo.Owner.GetLogin(), v.Repo.GetName(), v.Repo.GetNodeID(), num)
+		return g.fetchRepoProject(g.logger, client, webhook.Pipe(), webhook, webhook.CustomerID(), webhook.IntegrationInstanceID(), repoLogin, v.Repo.GetName(), v.Repo.GetNodeID(), num)
+	case *github.MilestoneEvent:
+		repoLogin := getRepoOwnerLogin(v.Repo)
+		userManager := NewUserManager(webhook.CustomerID(), []string{repoLogin}, webhook, webhook.State(), webhook.Pipe(), g, webhook.IntegrationInstanceID(), false)
+		issue, err := g.fromMilestoneEvent(g.logger, client, userManager, webhook, webhook.CustomerID(), webhook.IntegrationInstanceID(), v)
+		if err != nil {
+			return err
+		}
+		if issue != nil {
+			objects = []sdk.Model{issue}
+		}
 	}
 	for _, object := range objects {
 		sdk.LogDebug(g.logger, "sending webhook to pipe", "data", object.Stringify())

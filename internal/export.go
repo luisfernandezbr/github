@@ -408,6 +408,70 @@ func (g *GithubIntegration) fetchViewer(logger sdk.Logger, client sdk.GraphQLCli
 	}
 }
 
+func (g *GithubIntegration) fetchAllRepoMilestones(logger sdk.Logger, client sdk.GraphQLClient, userManager *UserManager, export sdk.Export, repoLogin string, repoName, repoRefID string, historical bool) error {
+	var variables = map[string]interface{}{
+		"owner": repoLogin,
+		"name":  repoName,
+	}
+	var after, before string
+	var retryCount int
+	var first string
+	customerID := export.CustomerID()
+	integrationInstanceID := export.IntegrationInstanceID()
+	projectID := sdk.NewWorkProjectID(customerID, repoRefID, refType)
+	pipe := export.Pipe()
+	name := repoLogin + "/" + repoName
+	state := export.State()
+	state.Get("milestones_"+name, &before)
+	if before != "" {
+		variables["before"] = before
+	}
+	for {
+		if after != "" {
+			variables["after"] = after
+			delete(variables, "before")
+		}
+		sdk.LogDebug(logger, "running fetch all repo milestones", "name", repoName, "login", repoLogin, "after", after, "limit", variables["first"], "retryCount", retryCount)
+		var result repositoryMilestonesResult
+		fmt.Println(variables)
+		if err := client.Query(repositoryMilestonesQuery, variables, &result); err != nil {
+			if g.checkForAbuseDetection(logger, export, err) {
+				continue
+			}
+			if g.checkForRetryableError(logger, export, err) {
+				continue
+			}
+			return err
+		}
+		retryCount = 0
+		for _, node := range result.Repository.Milestones.Nodes {
+			issue, err := node.ToModel(logger, userManager, customerID, integrationInstanceID, name, projectID)
+			if err != nil {
+				return err
+			}
+			if issue != nil {
+				if err := pipe.Write(issue); err != nil {
+					return err
+				}
+			}
+		}
+		if err := g.checkForRateLimit(logger, export, result.RateLimit); err != nil {
+			return err
+		}
+		if first == "" {
+			first = result.Repository.Milestones.PageInfo.StartCursor
+		}
+		if !result.Repository.Milestones.PageInfo.HasNextPage {
+			break
+		}
+		after = result.Repository.Milestones.PageInfo.EndCursor
+	}
+	if first != "" {
+		return state.Set("milestones_"+name, first)
+	}
+	return nil
+}
+
 func (g *GithubIntegration) fetchAllRepoIssues(logger sdk.Logger, client sdk.GraphQLClient, userManager *UserManager, export sdk.Export, repoLogin string, repoName, repoRefID string, historical bool) error {
 	var variables = map[string]interface{}{
 		"owner": repoLogin,
@@ -971,6 +1035,9 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 		if r.HasIssuesEnabled {
 			sdk.LogDebug(logger, "issues enabled for this repo", "name", node.Name)
 			if err := g.fetchAllRepoIssues(logger, client, userManager, export, r.Login, r.RepoName, r.ID, export.Historical()); err != nil {
+				return err
+			}
+			if err := g.fetchAllRepoMilestones(logger, client, userManager, export, r.Login, r.RepoName, r.ID, export.Historical()); err != nil {
 				return err
 			}
 		}

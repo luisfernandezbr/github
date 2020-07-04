@@ -27,7 +27,7 @@ The following features are supported by this integration:
 | Pull Comment        |   ✅   |    ✅   |                              |
 | Pull Request Review |   ✅   |    ✅   |                              |
 | Project             |   ✅   |    ✅   |                              |
-| Epic                |   🛑   |    🛑   | No concept of Epics          |
+| Epic                |   ✅   |    ✅   | Milestones act as Epics      |
 | Sprint              |   🛑   |    🛑   | Repo projects act as Kanban  |
 | Kanban              |   ✅   |    ✅   |                              |
 | Issue               |   ✅   |    ✅   |                              |
@@ -58,12 +58,12 @@ You will need the following to build and run locally:
 You can run locally to test against a repo with the following command (assuming you already have the Agent SDK installed):
 
 ```
-agent dev . --log-level=debug --set "apikey_auth={\"apikey\":\"$GITHUB_TOKEN\"}" --set 'inclusions={"pinpt":"pinpt/agent"}'
+agent dev . --log-level=debug --set "apikey_auth={\"apikey\":\"$GITHUB_TOKEN\"}" --set 'inclusions={"pinpt":"pinpt/agent"}' --dir dist
 ```
 
 Make sure you have the environment variable `GITHUB_TOKEN` set to a GitHub personal access token.  You can also change repositories by updating the `inclusions` array.  The key in the map should be the `organization` login value.
 
-This will run an export for GitHub and print all the JSON objects to the console.
+This will run an export for GitHub and save the files to the directory specified by `--dist`.
 
 ## Contributions
 

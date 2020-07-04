@@ -35,21 +35,26 @@ type commentsNode struct {
 	Nodes []comment `json:"nodes"`
 }
 
+type issueMilestone struct {
+	ID string `json:"id"`
+}
+
 type issue struct {
-	ID        string        `json:"id"`
-	CreatedAt time.Time     `json:"createdAt"`
-	UpdatedAt time.Time     `json:"updatedAt"`
-	ClosedAt  *time.Time    `json:"closedAt"`
-	State     string        `json:"state"`
-	URL       string        `json:"url"`
-	Title     string        `json:"title"`
-	Body      string        `json:"body"`
-	Closed    bool          `json:"closed"`
-	Labels    labelNode     `json:"labels"`
-	Comments  commentsNode  `json:"comments"`
-	Assignees assigneesNode `json:"assignees"`
-	Author    author        `json:"author"`
-	Number    int           `json:"number"`
+	ID        string          `json:"id"`
+	CreatedAt time.Time       `json:"createdAt"`
+	UpdatedAt time.Time       `json:"updatedAt"`
+	ClosedAt  *time.Time      `json:"closedAt"`
+	State     string          `json:"state"`
+	URL       string          `json:"url"`
+	Title     string          `json:"title"`
+	Body      string          `json:"body"`
+	Closed    bool            `json:"closed"`
+	Labels    labelNode       `json:"labels"`
+	Comments  commentsNode    `json:"comments"`
+	Assignees assigneesNode   `json:"assignees"`
+	Author    author          `json:"author"`
+	Number    int             `json:"number"`
+	Milestone *issueMilestone `json:"milestone"`
 }
 
 type issueNode struct {
@@ -71,6 +76,8 @@ const (
 	issueTypeCacheKeyPrefix = "issue_type_"
 	defaultIssueTypeRefID   = ""
 	defaultIssueTypeName    = "Task"
+	epicIssueTypeRefID      = "epic"
+	epicIssueTypeName       = "Epic"
 )
 
 func (g *GithubIntegration) processDefaultIssueType(logger sdk.Logger, pipe sdk.Pipe, state sdk.State, customerID string, integrationInstanceID string, historical bool) error {
@@ -88,8 +95,23 @@ func (g *GithubIntegration) processDefaultIssueType(logger sdk.Logger, pipe sdk.
 		if err := pipe.Write(&t); err != nil {
 			return err
 		}
-		sdk.LogDebug(logger, "writing a default issue state type")
-		return state.Set(key, t.ID)
+		sdk.LogDebug(logger, "writing a default issue type to state")
+		if err := state.Set(key, t.ID); err != nil {
+			return err
+		}
+		t.RefID = epicIssueTypeRefID
+		t.RefType = refType
+		t.Name = epicIssueTypeName
+		t.Description = sdk.StringPointer("milestone issue type")
+		t.MappedType = sdk.WorkIssueTypeMappedTypeEpic
+		t.ID = sdk.NewWorkIssueTypeID(customerID, refType, t.RefID)
+		if err := pipe.Write(&t); err != nil {
+			return err
+		}
+		sdk.LogDebug(logger, "writing a milestone issue type to state")
+		if err := state.Set(key, t.ID); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -161,6 +183,9 @@ func (g *GithubIntegration) fromIssueEvent(logger sdk.Logger, userManager *UserM
 	issue.Number = theIssue.GetNumber()
 	issue.Author = userToAuthor(theIssue.User)
 	issue.Assignees = assigneesNode{Nodes: make([]author, 0)}
+	if theIssue.Milestone != nil {
+		issue.Milestone = &issueMilestone{theIssue.Milestone.GetNodeID()}
+	}
 	for _, a := range theIssue.Assignees {
 		issue.Assignees.Nodes = append(issue.Assignees.Nodes, userToAuthor(a))
 	}
@@ -208,6 +233,9 @@ func (i issue) ToModel(logger sdk.Logger, userManager *UserManager, customerID s
 		if err := userManager.emitAuthor(logger, i.Assignees.Nodes[0]); err != nil {
 			return nil, err
 		}
+	}
+	if i.Milestone != nil {
+		issue.ParentID = sdk.NewWorkIssueID(customerID, i.Milestone.ID, refType)
 	}
 	return &issue, nil
 }

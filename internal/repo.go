@@ -75,7 +75,6 @@ func (r repository) ToModel(customerID string, integrationInstanceID string, log
 		repo.Affiliation = sdk.SourceCodeRepoAffiliationThirdparty
 	} else {
 		if scope == sdk.ConfigAccountTypeUser {
-			// TODO: need to check the user and determine if they are member of the org using the userManager
 			repo.Affiliation = sdk.SourceCodeRepoAffiliationUser
 		} else if scope == sdk.ConfigAccountTypeOrg {
 			repo.Affiliation = sdk.SourceCodeRepoAffiliationOrganization
@@ -84,4 +83,18 @@ func (r repository) ToModel(customerID string, integrationInstanceID string, log
 
 	// since a repo can also possibly be a work project, try and create it too
 	return repo, r.ToProjectModel(repo)
+}
+
+func getRepoOwnerLogin(repo *github.Repository) string {
+	if repo.Organization != nil {
+		return repo.Organization.GetLogin()
+	}
+	return repo.Owner.GetLogin()
+}
+
+func getPushRepoOwnerLogin(repo *github.PushEventRepository) string {
+	if repo.Organization != nil {
+		return repo.GetOrganization()
+	}
+	return repo.Owner.GetLogin()
 }
