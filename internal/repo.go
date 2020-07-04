@@ -22,7 +22,7 @@ type repository struct {
 	} `json:"owner"`
 }
 
-func (r repository) ToModel(customerID string, integrationID string, login string, isPrivate bool, scope sdk.ConfigAccountType) *sdk.SourceCodeRepo {
+func (r repository) ToModel(customerID string, integrationInstanceID string, login string, isPrivate bool, scope sdk.ConfigAccountType) *sdk.SourceCodeRepo {
 	repo := &sdk.SourceCodeRepo{}
 	repo.ID = sdk.NewSourceCodeRepoID(customerID, repo.ID, refType)
 	repo.CustomerID = customerID
@@ -35,7 +35,7 @@ func (r repository) ToModel(customerID string, integrationID string, login strin
 	repo.URL = r.URL
 	repo.UpdatedAt = sdk.TimeToEpoch(r.UpdatedAt)
 	repo.Active = !r.IsArchived
-	repo.IntegrationInstanceID = sdk.StringPointer(integrationID)
+	repo.IntegrationInstanceID = sdk.StringPointer(integrationInstanceID)
 	if isPrivate {
 		repo.Visibility = sdk.SourceCodeRepoVisibilityPrivate
 	} else {

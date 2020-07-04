@@ -30,7 +30,7 @@ func (u *UserManager) emitAuthor(logger sdk.Logger, author author) error {
 		u.mu.Unlock()
 		return nil
 	}
-	user := author.ToModel(u.customerID)
+	user := author.ToModel(u.customerID, u.instanceid)
 	u.users[refID] = true
 	u.mu.Unlock()
 	return u.pipe.Write(user)

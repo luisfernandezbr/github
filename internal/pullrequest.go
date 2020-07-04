@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/go-github/v32/github"
+	"github.com/pinpt/agent.next/pkg/util"
 	"github.com/pinpt/agent.next/sdk"
 )
 
@@ -60,7 +61,10 @@ func (g *GithubIntegration) fromPullRequestEvent(logger sdk.Logger, client sdk.G
 	case "opened", "synchronize", "edited", "ready_for_review", "locked", "unlocked", "reopened", "closed", "converted_to_draft":
 		var object pullrequest
 		object.ID = *pr.PullRequest.NodeID
-		object.Body = *pr.PullRequest.Body // FIXME
+		if pr.PullRequest.Body != nil {
+			object.Body = toHTML(*pr.PullRequest.Body)
+			fmt.Println(object.Body)
+		}
 		object.URL = *pr.PullRequest.HTMLURL
 		if action == "closed" {
 			// If the action is "closed" and the "merged" key is "false", the pull request was closed with unmerged commits.
@@ -84,7 +88,6 @@ func (g *GithubIntegration) fromPullRequestEvent(logger sdk.Logger, client sdk.G
 		if pr.PullRequest.MergedAt != nil {
 			object.MergedAt = *pr.PullRequest.MergedAt
 		}
-		// TODO: do the remaining fields
 		object.Branch = *pr.PullRequest.Head.Ref
 		object.MergeCommit = oidProp{*pr.PullRequest.Base.SHA}
 		repoID := sdk.NewSourceCodeRepoID(customerID, *pr.Repo.NodeID, refType)
@@ -126,7 +129,6 @@ func setPullRequestCommits(pullrequest *sdk.SourceCodePullRequest, commits []*sd
 }
 
 func (pr pullrequest) ToModel(logger sdk.Logger, userManager *UserManager, customerID string, repoName string, repoID string) (*sdk.SourceCodePullRequest, error) {
-	// FIXME: implement the remaining fields
 	pullrequest := &sdk.SourceCodePullRequest{}
 	pullrequest.ID = sdk.NewSourceCodePullRequestID(customerID, pr.ID, refType, repoID)
 	pullrequest.CustomerID = customerID
@@ -196,19 +198,23 @@ func (pr pullrequest) ToModel(logger sdk.Logger, userManager *UserManager, custo
 	return pullrequest, nil
 }
 
-func (g *GithubIntegration) updatePullrequest(logger sdk.Logger, config sdk.Config, id string, partial *sdk.SourceCodePullRequestPartial, user sdk.MutationUser) error {
+func (g *GithubIntegration) updatePullrequest(logger sdk.Logger, config sdk.Config, id string, mutation *sdk.SourcecodePullRequestUpdateMutation, user sdk.MutationUser) error {
 	payload := make(map[string]interface{})
-	if partial.Title != nil {
-		payload["title"] = *partial.Title
+	if mutation.Title != nil {
+		payload["title"] = *mutation.Title
 	}
-	if partial.Description != nil {
-		payload["body"] = *partial.Description
+	if mutation.Description != nil {
+		md, err := util.ConvertHTMLToMarkdown(*mutation.Description)
+		if err != nil {
+			return fmt.Errorf("not able to transform body from HTML to Markdown: %w", err)
+		}
+		payload["body"] = md
 	}
-	if partial.Status != nil {
-		payload["state"] = *partial.Status
+	if mutation.Status != nil {
+		payload["state"] = *mutation.Status
 	}
 	if len(payload) == 0 {
-		return fmt.Errorf("the mutation failed because invalid value was passed: %s", sdk.Stringify(partial))
+		return fmt.Errorf("the mutation failed because invalid value was passed: %s", sdk.Stringify(mutation))
 	}
 	payload["pullRequestId"] = id
 	var c sdk.Config // copy in the config for the user
@@ -224,6 +230,7 @@ func (g *GithubIntegration) updatePullrequest(logger sdk.Logger, config sdk.Conf
 	if err := client.Query(pullRequestUpdateMutation, map[string]interface{}{"input": payload}, &resp); err != nil {
 		return err
 	}
+	// TODO: if webhook not enabled, we want to pull the PR result and ingest into pipe
 	return nil
 }
 

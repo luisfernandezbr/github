@@ -20,12 +20,13 @@ type author struct {
 	Type   string `json:"type"`
 }
 
-func (a author) ToModel(customerID string) *sdk.SourceCodeUser {
+func (a author) ToModel(customerID string, integrationInstanceID string) *sdk.SourceCodeUser {
 	user := &sdk.SourceCodeUser{}
 	user.CustomerID = customerID
 	user.RefID = a.RefID(customerID)
 	user.RefType = refType
 	user.ID = sdk.NewSourceCodeUserID(customerID, refType, user.RefID)
+	user.IntegrationInstanceID = sdk.StringPointer(integrationInstanceID)
 	user.URL = sdk.StringPointer(a.URL)
 	user.AvatarURL = sdk.StringPointer(a.Avatar)
 	user.Email = sdk.StringPointer(a.Email)
@@ -82,7 +83,7 @@ func (a gitUser) RefID(customerID string) string {
 	return ""
 }
 
-func (a gitUser) ToModel(customerID string, integrationID string) *sdk.SourceCodeUser {
+func (a gitUser) ToModel(customerID string, integrationInstanceID string) *sdk.SourceCodeUser {
 	user := &sdk.SourceCodeUser{}
 	user.CustomerID = customerID
 	user.RefID = a.RefID(customerID)
@@ -93,7 +94,7 @@ func (a gitUser) ToModel(customerID string, integrationID string) *sdk.SourceCod
 			user.AssociatedRefID = sdk.StringPointer(id)
 		}
 	}
-	user.IntegrationInstanceID = sdk.StringPointer(integrationID)
+	user.IntegrationInstanceID = sdk.StringPointer(integrationInstanceID)
 	user.URL = sdk.StringPointer(a.User.URL)
 	user.AvatarURL = sdk.StringPointer(a.Avatar)
 	user.Email = sdk.StringPointer(a.Email)

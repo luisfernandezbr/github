@@ -27,21 +27,21 @@ func (g *GithubIntegration) isOrgWebHookInstalled(state sdk.State, login string)
 	return state.Exists(key)
 }
 
-func (g *GithubIntegration) installRepoWebhookIfRequired(customerID string, logger sdk.Logger, state sdk.State, client sdk.HTTPClient, login string, integrationID string, repo string) error {
+func (g *GithubIntegration) installRepoWebhookIfRequired(customerID string, logger sdk.Logger, state sdk.State, client sdk.HTTPClient, login string, integrationInstanceID string, repo string) error {
 	if g.isOrgWebHookInstalled(state, login) {
 		return nil
 	}
-	key := repoWebhookInstalledStateKeyPrefix + integrationID + "_" + repo
+	key := repoWebhookInstalledStateKeyPrefix + integrationInstanceID + "_" + repo
 	var id int64
 	found, err := state.Get(key, &id)
 	if err != nil {
 		return fmt.Errorf("error fetching webhook state key: %w", err)
 	}
 	if found {
-		sdk.LogInfo(logger, "webhook already exists for this repo", "name", repo, "integration_id", integrationID)
+		sdk.LogInfo(logger, "webhook already exists for this repo", "name", repo, "integration_id", integrationInstanceID)
 		return nil
 	}
-	url, err := g.manager.CreateWebHook(customerID, refType, integrationID, login)
+	url, err := g.manager.CreateWebHook(customerID, refType, integrationInstanceID, login)
 	if err != nil {
 		if err.Error() == "webhook: disabled" {
 			sdk.LogInfo(logger, "webhooks are disabled in dev mode")
@@ -56,7 +56,7 @@ func (g *GithubIntegration) installRepoWebhookIfRequired(customerID string, logg
 			"url":          url,
 			"content_type": "json",
 			"insecure_ssl": "0",
-			"secret":       integrationID,
+			"secret":       integrationInstanceID,
 		},
 		"events": webhookEvents,
 		"active": true,
@@ -79,8 +79,8 @@ func (g *GithubIntegration) installRepoWebhookIfRequired(customerID string, logg
 	return fmt.Errorf("error saving repo %s webhook url, expected 201 status code but received %v", repo, resp.StatusCode)
 }
 
-func (g *GithubIntegration) uninstallRepoWebhook(state sdk.State, client sdk.HTTPClient, login string, integrationID string, repo string) {
-	key := repoWebhookInstalledStateKeyPrefix + integrationID + "_" + repo
+func (g *GithubIntegration) uninstallRepoWebhook(state sdk.State, client sdk.HTTPClient, login string, integrationInstanceID string, repo string) {
+	key := repoWebhookInstalledStateKeyPrefix + integrationInstanceID + "_" + repo
 	var id int64
 	state.Get(key, &id)
 	if id > 0 {
@@ -91,7 +91,7 @@ func (g *GithubIntegration) uninstallRepoWebhook(state sdk.State, client sdk.HTT
 	state.Delete(key)
 }
 
-func (g *GithubIntegration) unregisterWebhook(state sdk.State, client sdk.HTTPClient, login string, integrationID string, hookendpoint string) error {
+func (g *GithubIntegration) unregisterWebhook(state sdk.State, client sdk.HTTPClient, login string, integrationInstanceID string, hookendpoint string) error {
 	key := orgWebhookInstalledStateKeyPrefix + login
 	if g.isOrgWebHookInstalled(state, login) {
 		var id int64
@@ -115,13 +115,13 @@ func (g *GithubIntegration) unregisterWebhook(state sdk.State, client sdk.HTTPCl
 			state.Get(previousReposStateKey, &previousRepos)
 		}
 		for repo := range previousRepos {
-			g.uninstallRepoWebhook(state, client, login, integrationID, repo)
+			g.uninstallRepoWebhook(state, client, login, integrationInstanceID, repo)
 		}
 	}
 	return nil
 }
 
-func (g *GithubIntegration) registerWebhook(customerID string, state sdk.State, client sdk.HTTPClient, login string, integrationID string, hookendpoint string) error {
+func (g *GithubIntegration) registerWebhook(customerID string, state sdk.State, client sdk.HTTPClient, login string, integrationInstanceID string, hookendpoint string) error {
 	if g.isOrgWebHookInstalled(state, login) {
 		return nil
 	}
@@ -134,17 +134,17 @@ func (g *GithubIntegration) registerWebhook(customerID string, state sdk.State, 
 	}
 	var found bool
 	for _, hook := range webhooks {
-		if strings.Contains(hook.URL, "event-api") && strings.Contains(hook.URL, "pinpoint.com") && strings.Contains(hook.URL, integrationID) {
+		if strings.Contains(hook.URL, "event-api") && strings.Contains(hook.URL, "pinpoint.com") && strings.Contains(hook.URL, integrationInstanceID) {
 			found = true
 			break
 		}
 	}
 	if !found {
-		url, err := g.manager.CreateWebHook(customerID, refType, integrationID, login)
+		url, err := g.manager.CreateWebHook(customerID, refType, integrationInstanceID, login)
 		if err != nil {
 			return fmt.Errorf("error creating webhook url for %s: %w", login, err)
 		}
-		url += "?integration_id=" + integrationID
+		url += "?integration_id=" + integrationInstanceID
 		// need to try and install
 		params := map[string]interface{}{
 			"name": "web",
@@ -152,7 +152,7 @@ func (g *GithubIntegration) registerWebhook(customerID string, state sdk.State, 
 				"url":          url,
 				"content_type": "json",
 				"insecure_ssl": "0",
-				"secret":       integrationID,
+				"secret":       integrationInstanceID,
 			},
 			"events": webhookEvents,
 			"active": true,
@@ -193,6 +193,7 @@ func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 	var object sdk.Model
 	switch v := obj.(type) {
 	case *github.PullRequestEvent:
+		// TODO: we should probably hash users in state so we don't emit each time we do something
 		userManager := NewUserManager(webhook.CustomerID(), []string{*v.Repo.Owner.Login}, webhook, webhook.Pipe(), g, webhook.IntegrationInstanceID())
 		obj, err := g.fromPullRequestEvent(g.logger, client, userManager, webhook, webhook.CustomerID(), v)
 		if err != nil {

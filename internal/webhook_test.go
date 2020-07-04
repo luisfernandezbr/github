@@ -62,7 +62,7 @@ func (w *testWebhook) CustomerID() string {
 	return "1234"
 }
 
-// IntegrationID will return the unique instance id for this integration for a customer
+// IntegrationInstanceID will return the unique instance id for this integration for a customer
 func (w *testWebhook) IntegrationInstanceID() string {
 	return "999"
 }
