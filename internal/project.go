@@ -1,6 +1,8 @@
 package internal
 
 import (
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/pinpt/agent.next/sdk"
@@ -49,10 +51,23 @@ type repoProjectNode struct {
 	Nodes []repoProject `json:"nodes"`
 }
 
-type repProjectResult struct {
+type repoProjectsResult struct {
 	Repository struct {
 		Projects repoProjectNode `json:"projects"`
 	} `json:"repository"`
+}
+
+type repoProjectResult struct {
+	Repository struct {
+		Project repoProject `json:"project"`
+	} `json:"repository"`
+}
+
+func getProjectIDfromURL(url string) int {
+	i := strings.LastIndex(url, "/")
+	val := url[i:1]
+	num, _ := strconv.ParseInt(val, 10, 32)
+	return int(num)
 }
 
 func (p repoProject) ToModel(logger sdk.Logger, customerID string, integrationInstanceID string, projectID string) *sdk.WorkKanbanBoard {

@@ -262,6 +262,13 @@ func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 		if issue != nil {
 			objects = []sdk.Model{issue}
 		}
+	case *github.ProjectEvent:
+		return g.fetchRepoProject(g.logger, client, webhook.Pipe(), webhook, webhook.CustomerID(), webhook.IntegrationInstanceID(), v.Repo.Owner.GetLogin(), v.Repo.GetName(), v.Repo.GetNodeID(), v.Project.GetNumber())
+	case *github.ProjectCardEvent:
+		return g.fetchRepoProject(g.logger, client, webhook.Pipe(), webhook, webhook.CustomerID(), webhook.IntegrationInstanceID(), v.Repo.Owner.GetLogin(), v.Repo.GetName(), v.Repo.GetNodeID(), int(v.GetProjectCard().GetProjectID()))
+	case *github.ProjectColumnEvent:
+		num := getProjectIDfromURL(v.ProjectColumn.GetProjectURL())
+		return g.fetchRepoProject(g.logger, client, webhook.Pipe(), webhook, webhook.CustomerID(), webhook.IntegrationInstanceID(), v.Repo.Owner.GetLogin(), v.Repo.GetName(), v.Repo.GetNodeID(), num)
 	}
 	for _, object := range objects {
 		sdk.LogDebug(g.logger, "sending webhook to pipe", "data", object.Stringify())

@@ -480,15 +480,48 @@ func (g *GithubIntegration) fetchAllRepoIssues(logger sdk.Logger, client sdk.Gra
 	return nil
 }
 
-func (g *GithubIntegration) fetchRepoProject(logger sdk.Logger, client sdk.GraphQLClient, export sdk.Export, repoOwner, repoName, repoRefID string) error {
+func (g *GithubIntegration) fetchRepoProject(logger sdk.Logger, client sdk.GraphQLClient, pipe sdk.Pipe, control sdk.Control, customerID, integrationInstanceID, repoOwner, repoName, repoRefID string, num int) error {
+	var retryCount int
+	variables := map[string]interface{}{
+		"owner": repoOwner,
+		"name":  repoName,
+		"num":   num,
+	}
+	for {
+		sdk.LogDebug(logger, "running repo project query", "retryCount", retryCount, "num", num, "name", repoName)
+		var result repoProjectResult
+		if err := client.Query(repoProjectsQuery, variables, &result); err != nil {
+			if g.checkForAbuseDetection(logger, control, err) {
+				continue
+			}
+			if g.checkForRetryableError(logger, control, err) {
+				retryCount++
+				continue
+			}
+			return err
+		}
+		projectID := sdk.NewWorkProjectID(customerID, repoRefID, refType)
+		p := result.Repository.Project.ToModel(logger, customerID, integrationInstanceID, projectID)
+		if p != nil {
+			sdk.LogDebug(logger, "writing repo project", "name", p.Name)
+			if err := pipe.Write(p); err != nil {
+				return err
+			}
+		}
+		retryCount = 0
+		return nil
+	}
+}
+
+func (g *GithubIntegration) fetchRepoProjects(logger sdk.Logger, client sdk.GraphQLClient, export sdk.Export, repoOwner, repoName, repoRefID string) error {
 	var retryCount int
 	variables := map[string]interface{}{
 		"owner": repoOwner,
 		"name":  repoName,
 	}
 	for {
-		sdk.LogDebug(logger, "running repo project query", "retryCount", retryCount)
-		var result repProjectResult
+		sdk.LogDebug(logger, "running repo project query", "retryCount", retryCount, "name", repoName)
+		var result repoProjectsResult
 		if err := client.Query(repoProjectsQuery, variables, &result); err != nil {
 			if g.checkForAbuseDetection(logger, export, err) {
 				continue
@@ -944,7 +977,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 
 		if project != nil && r.HasProjectsEnabled {
 			sdk.LogDebug(logger, "projects enabled for this repo", "name", node.Name)
-			if err := g.fetchRepoProject(logger, client, export, r.Login, r.RepoName, r.ID); err != nil {
+			if err := g.fetchRepoProjects(logger, client, export, r.Login, r.RepoName, r.ID); err != nil {
 				return err
 			}
 		}

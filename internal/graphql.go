@@ -797,6 +797,42 @@ query getIssues($name: String!, $owner: String!, $before: String, $after: String
  }
 `
 
+var projectIssuesQuery = `
+query getBoardIssues($name: String!, $owner: String!, $num: Int!) {
+	repository(name: $name, owner: $owner) {
+		project(number: $num) {
+			name
+			id
+			url
+			updatedAt
+			columns(first: 100) {
+				nodes {
+					id
+					name
+					purpose
+					cards(first: 100, archivedStates: NOT_ARCHIVED) {
+						nodes {
+						id
+						__typename
+						state
+						note
+						content {
+							__typename
+							... on Issue {
+								id
+							}
+							... on PullRequest {
+								id
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+`
+
 var pullrequestNodeIDQuery = `
 query getPRNodeID($name: String!, $owner: String!, $number: Int!) { 
 	repository(name: $name owner: $owner){
