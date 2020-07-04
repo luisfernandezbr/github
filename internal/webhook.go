@@ -196,7 +196,7 @@ func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 	var objects []sdk.Model
 	switch v := obj.(type) {
 	case *github.PushEvent:
-		userManager := NewUserManager(webhook.CustomerID(), []string{*v.Repo.Owner.Login}, webhook, webhook.Pipe(), g, webhook.IntegrationInstanceID())
+		userManager := NewUserManager(webhook.CustomerID(), []string{*v.Repo.Owner.Login}, webhook, webhook.State(), webhook.Pipe(), g, webhook.IntegrationInstanceID(), false)
 		commits, err := g.fromPushEvent(g.logger, client, userManager, webhook, webhook.CustomerID(), v)
 		if err != nil {
 			return err
@@ -205,7 +205,7 @@ func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 			objects = append(objects, commit)
 		}
 	case *github.PullRequestEvent:
-		userManager := NewUserManager(webhook.CustomerID(), []string{*v.Repo.Owner.Login}, webhook, webhook.Pipe(), g, webhook.IntegrationInstanceID())
+		userManager := NewUserManager(webhook.CustomerID(), []string{*v.Repo.Owner.Login}, webhook, webhook.State(), webhook.Pipe(), g, webhook.IntegrationInstanceID(), false)
 		obj, err := g.fromPullRequestEvent(g.logger, client, userManager, webhook, webhook.CustomerID(), v)
 		if err != nil {
 			return err
@@ -214,7 +214,7 @@ func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 			objects = []sdk.Model{obj}
 		}
 	case *github.PullRequestReviewEvent:
-		userManager := NewUserManager(webhook.CustomerID(), []string{*v.Repo.Owner.Login}, webhook, webhook.Pipe(), g, webhook.IntegrationInstanceID())
+		userManager := NewUserManager(webhook.CustomerID(), []string{*v.Repo.Owner.Login}, webhook, webhook.State(), webhook.Pipe(), g, webhook.IntegrationInstanceID(), false)
 		obj, err := g.fromPullRequestReviewEvent(g.logger, client, userManager, webhook, webhook.CustomerID(), v)
 		if err != nil {
 			return err
@@ -224,7 +224,7 @@ func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 		}
 	case *github.IssueCommentEvent:
 		if isIssueCommentPR(v) {
-			userManager := NewUserManager(webhook.CustomerID(), []string{*v.Repo.Owner.Login}, webhook, webhook.Pipe(), g, webhook.IntegrationInstanceID())
+			userManager := NewUserManager(webhook.CustomerID(), []string{*v.Repo.Owner.Login}, webhook, webhook.State(), webhook.Pipe(), g, webhook.IntegrationInstanceID(), false)
 			obj, err := g.fromPullRequestCommentEvent(g.logger, client, userManager, webhook, webhook.CustomerID(), v)
 			if err != nil {
 				return err
@@ -233,7 +233,7 @@ func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 				objects = []sdk.Model{obj}
 			}
 		} else {
-			userManager := NewUserManager(webhook.CustomerID(), []string{*v.Repo.Owner.Login}, webhook, webhook.Pipe(), g, webhook.IntegrationInstanceID())
+			userManager := NewUserManager(webhook.CustomerID(), []string{*v.Repo.Owner.Login}, webhook, webhook.State(), webhook.Pipe(), g, webhook.IntegrationInstanceID(), false)
 			obj, err := g.fromIssueCommentEvent(g.logger, client, userManager, webhook, webhook.CustomerID(), webhook.IntegrationInstanceID(), v)
 			if err != nil {
 				return err
@@ -254,7 +254,7 @@ func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 			}
 		}
 	case *github.IssuesEvent:
-		userManager := NewUserManager(webhook.CustomerID(), []string{*v.Repo.Owner.Login}, webhook, webhook.Pipe(), g, webhook.IntegrationInstanceID())
+		userManager := NewUserManager(webhook.CustomerID(), []string{*v.Repo.Owner.Login}, webhook, webhook.State(), webhook.Pipe(), g, webhook.IntegrationInstanceID(), false)
 		issue, err := g.fromIssueEvent(g.logger, userManager, webhook.IntegrationInstanceID(), webhook.CustomerID(), v)
 		if err != nil {
 			return err

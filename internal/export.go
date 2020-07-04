@@ -814,10 +814,10 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 
 	customerID := export.CustomerID()
 	instanceID := export.IntegrationInstanceID()
-	userManager := NewUserManager(customerID, orgs, export, pipe, g, instanceID)
+	state := export.State()
+	userManager := NewUserManager(customerID, orgs, export, state, pipe, g, instanceID, export.Historical())
 	jobs := make([]job, 0)
 	started := time.Now()
-	state := export.State()
 	var repoCount, prCount, reviewCount, commitCount, commentCount int
 	var hasPreviousRepos bool
 	previousRepos := make(map[string]*sdk.SourceCodeRepo)
