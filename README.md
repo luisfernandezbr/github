@@ -36,7 +36,7 @@ The following features are supported by this integration:
 | Issue Status        |   ✅   |    ✅   | Open and Closed status only  |
 | Issue Priority      |   🛑   |    🛑   | No concept of priority       |
 | Issue Resolution    |   🛑   |    🛑   | No concept of resolution     |
-| Issue Parent/Child  |   🛑   |    🛑   | No concept of parent/child   |
+| Issue Parent/Child  |   ✅   |    ✅   | Milestones are parents       |
 | Work Config         |   ✅   |    -    | Open and Closed states only  |
 | Mutations           |   -    |    📝   | Partial / WIP                |
 | Feed Notifications  |   🗓   |    🗓   | TODO                         |
