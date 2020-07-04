@@ -236,12 +236,15 @@ func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 			// TODO: issue comments
 		}
 	case *github.RepositoryEvent:
-		obj := g.fromRepositoryEvent(g.logger, webhook.IntegrationInstanceID(), webhook.CustomerID(), v)
+		repo, project := g.fromRepositoryEvent(g.logger, webhook.IntegrationInstanceID(), webhook.CustomerID(), v)
 		if err != nil {
 			return err
 		}
-		if obj != nil {
-			objects = []sdk.Model{obj}
+		if repo != nil {
+			objects = []sdk.Model{repo}
+			if project != nil {
+				objects = append(objects, project)
+			}
 		}
 	}
 	for _, object := range objects {

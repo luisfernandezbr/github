@@ -17,13 +17,16 @@ type repository struct {
 	DefaultBranch nameProp     `json:"defaultBranchRef"`
 	IsArchived    bool         `json:"isArchived"`
 	IsFork        bool         `json:"isFork"`
+	HasProjects   bool         `json:"hasProjectsEnabled"`
+	HasIssues     bool         `json:"hasIssuesEnabled"`
+	Labels        labelNode    `json:"labels"`
 	Pullrequests  pullrequests `json:"pullRequests"`
 	Owner         struct {
 		Login string `json:"login"`
 	} `json:"owner"`
 }
 
-func (g *GithubIntegration) fromRepositoryEvent(logger sdk.Logger, integrationInstanceID string, customerID string, event *github.RepositoryEvent) *sdk.SourceCodeRepo {
+func (g *GithubIntegration) fromRepositoryEvent(logger sdk.Logger, integrationInstanceID string, customerID string, event *github.RepositoryEvent) (*sdk.SourceCodeRepo, *sdk.WorkProject) {
 	var repo repository
 	theRepo := event.GetRepo()
 	login := theRepo.Owner.GetLogin()
@@ -42,12 +45,14 @@ func (g *GithubIntegration) fromRepositoryEvent(logger sdk.Logger, integrationIn
 	repo.DefaultBranch = nameProp{theRepo.GetDefaultBranch()}
 	repo.IsArchived = theRepo.GetArchived()
 	repo.IsFork = theRepo.GetFork()
+	repo.HasIssues = theRepo.GetHasIssues()
+	repo.HasProjects = theRepo.GetHasProjects()
 	repo.Owner.Login = login
 	isPrivate := theRepo.GetPrivate()
 	return repo.ToModel(customerID, integrationInstanceID, login, isPrivate, scope)
 }
 
-func (r repository) ToModel(customerID string, integrationInstanceID string, login string, isPrivate bool, scope sdk.ConfigAccountType) *sdk.SourceCodeRepo {
+func (r repository) ToModel(customerID string, integrationInstanceID string, login string, isPrivate bool, scope sdk.ConfigAccountType) (*sdk.SourceCodeRepo, *sdk.WorkProject) {
 	repo := &sdk.SourceCodeRepo{}
 	repo.ID = sdk.NewSourceCodeRepoID(customerID, repo.ID, refType)
 	repo.CustomerID = customerID
@@ -76,5 +81,7 @@ func (r repository) ToModel(customerID string, integrationInstanceID string, log
 			repo.Affiliation = sdk.SourceCodeRepoAffiliationOrganization
 		}
 	}
-	return repo
+
+	// since a repo can also possibly be a work project, try and create it too
+	return repo, r.ToProjectModel(repo)
 }

@@ -401,13 +401,15 @@ func generateViewerLogin() string {
 }
 
 type repoName struct {
-	ID         string                `json:"id"`
-	RepoName   string                `json:"name"`
-	Name       string                `json:"nameWithOwner"`
-	IsPrivate  bool                  `json:"isPrivate"`
-	IsArchived bool                  `json:"isArchived"`
-	Scope      sdk.ConfigAccountType `json:"-"`
-	Login      string                `json:"-"`
+	ID                 string                `json:"id"`
+	RepoName           string                `json:"name"`
+	Name               string                `json:"nameWithOwner"`
+	IsPrivate          bool                  `json:"isPrivate"`
+	IsArchived         bool                  `json:"isArchived"`
+	HasProjectsEnabled bool                  `json:"hasProjectsEnabled"`
+	HasIssuesEnabled   bool                  `json:"hasIssuesEnabled"`
+	Scope              sdk.ConfigAccountType `json:"-"`
+	Login              string                `json:"-"`
 }
 
 type repoWithNameResult struct {
@@ -443,6 +445,8 @@ func generateAllReposQuery(after string, scope string) string {
 					nameWithOwner
 					isPrivate
 					isArchived
+					hasProjectsEnabled
+					hasIssuesEnabled
 				}
 			}
 		}
@@ -454,6 +458,56 @@ func generateAllReposQuery(after string, scope string) string {
 		}
 	}`, definitionLine, argLine, scope)
 }
+
+var repoProjectsQuery = `
+query getProjects($name: String!, $owner: String!) {
+	rateLimit {
+		limit
+		cost
+		remaining
+		resetAt
+	}
+	repository(name: $name, owner: $owner) {
+		projects(states: OPEN, last: 1) {
+			totalCount
+			pageInfo {
+				hasNextPage
+				startCursor
+				endCursor
+			}
+		 	nodes {
+				name
+				id
+				url
+				updatedAt
+				columns(first: 100) {
+					nodes {
+						id
+						name
+						purpose
+						cards(first: 100, archivedStates: NOT_ARCHIVED) {
+							nodes {
+							id
+							__typename
+							state
+							note
+							content {
+								__typename
+								... on Issue {
+									id
+								}
+								... on PullRequest {
+									id
+								}
+							}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}`
 
 func getAllRepoDataQuery(owner, name, label, cursor string) string {
 	var cursorVal string
@@ -475,8 +529,18 @@ func getAllRepoDataQuery(owner, name, label, cursor string) string {
 		}
 		isArchived
 		isFork
+		hasProjectsEnabled
+		hasIssuesEnabled
 		owner {
 			login
+		}
+		labels(first: 20, orderBy:{field:CREATED_AT, direction:ASC}) {
+			nodes {
+			  id
+			  name
+			  color
+			  description
+			}
 		}
 		pullRequests(first: 10, orderBy: {field: UPDATED_AT, direction: DESC} %s) {
 			totalCount
@@ -645,6 +709,93 @@ func getAllRepoDataQuery(owner, name, label, cursor string) string {
 		}
 	}`, label, name, owner, cursorVal)
 }
+
+var issuesQuery = `
+query getIssues($name: String!, $owner: String!, $before: String, $after: String) {
+	rateLimit {
+		limit
+		cost
+		remaining
+		resetAt
+	}
+	repository(name: $name, owner: $owner) {
+	  issues(first: 100, before: $before, after: $after, orderBy: {field: UPDATED_AT, direction: DESC}) {
+		totalCount
+		pageInfo {
+			hasNextPage
+			startCursor
+			endCursor
+		}
+		nodes {
+			__typename
+			id
+			createdAt
+			updatedAt
+			closedAt
+			state
+			url
+			title
+			body
+			closed
+			number
+			labels(first: 20, orderBy: {field: CREATED_AT, direction: ASC}) {
+				nodes {
+				  id
+				  name
+				  color
+				  description
+				}
+			}
+			comments(last: 100) {
+				totalCount
+				pageInfo {
+				  startCursor
+				  endCursor
+				  hasNextPage
+				  hasPreviousPage
+				}
+				nodes {
+				  id
+				  url
+				  body
+				  createdAt
+				  updatedAt
+				  author {
+					 type: __typename
+					 avatarUrl
+					 login
+					 url
+					 ... on User {
+						id
+						email
+						name
+					 }
+				  }
+				}
+			}  
+			assignees(last: 1) {
+			  nodes {
+				 id
+				 login
+				 avatarUrl
+			  }
+			}
+			author {
+				type: __typename
+				avatarUrl
+				login
+				url
+				... on User {
+					id
+					email
+					name
+				}
+			}
+		 }
+	  }
+	}
+ }
+`
 
 var pullrequestNodeIDQuery = `
 query getPRNodeID($name: String!, $owner: String!, $number: Int!) { 

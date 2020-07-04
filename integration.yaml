@@ -14,6 +14,12 @@ capabilities:
   - sourcecode.PullRequestCommit
   - sourcecode.PullRequestComment
   - web.Hook
+  - work.Config
+  - work.Issue
+  - work.IssueType
+  - work.IssueComment
+  - work.KanbanBoard
+  - work.Project
 installation:
   modes:
     - cloud

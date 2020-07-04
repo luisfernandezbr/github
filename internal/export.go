@@ -408,6 +408,112 @@ func (g *GithubIntegration) fetchViewer(logger sdk.Logger, client sdk.GraphQLCli
 	}
 }
 
+func (g *GithubIntegration) fetchAllRepoIssues(logger sdk.Logger, client sdk.GraphQLClient, userManager *UserManager, export sdk.Export, repoLogin string, repoName, repoRefID string, historical bool) error {
+	var variables = map[string]interface{}{
+		"owner": repoLogin,
+		"name":  repoName,
+	}
+	var after, before string
+	var retryCount int
+	var first string
+	customerID := export.CustomerID()
+	integrationInstanceID := export.IntegrationInstanceID()
+	projectID := sdk.NewWorkProjectID(customerID, repoRefID, refType)
+	pipe := export.Pipe()
+	name := repoLogin + "/" + repoName
+	state := export.State()
+	state.Get("issues_"+name, &before)
+	if before != "" {
+		variables["before"] = before
+	}
+	for {
+		if after != "" {
+			variables["after"] = after
+			delete(variables, "before")
+		}
+		sdk.LogDebug(logger, "running fetch all repo issues", "name", repoName, "login", repoLogin, "after", after, "limit", variables["first"], "retryCount", retryCount)
+		var result issueResult
+		if err := client.Query(issuesQuery, variables, &result); err != nil {
+			if g.checkForAbuseDetection(logger, export, err) {
+				continue
+			}
+			if g.checkForRetryableError(logger, export, err) {
+				continue
+			}
+			return err
+		}
+		retryCount = 0
+		for _, node := range result.Repository.Issues.Nodes {
+			issue, err := node.ToModel(logger, userManager, customerID, integrationInstanceID, name, projectID)
+			if err != nil {
+				return err
+			}
+			if issue != nil {
+				if err := pipe.Write(issue); err != nil {
+					return err
+				}
+				for _, c := range node.Comments.Nodes {
+					comment, err := c.ToModel(logger, userManager, customerID, integrationInstanceID, projectID, issue.ID)
+					if err != nil {
+						return err
+					}
+					if err := pipe.Write(comment); err != nil {
+						return err
+					}
+				}
+			}
+		}
+		if err := g.checkForRateLimit(logger, export, result.RateLimit); err != nil {
+			return err
+		}
+		if first == "" {
+			first = result.Repository.Issues.PageInfo.StartCursor
+		}
+		if !result.Repository.Issues.PageInfo.HasNextPage {
+			break
+		}
+		after = result.Repository.Issues.PageInfo.EndCursor
+	}
+	if first != "" {
+		return state.Set("issues_"+name, first)
+	}
+	return nil
+}
+
+func (g *GithubIntegration) fetchRepoProject(logger sdk.Logger, client sdk.GraphQLClient, export sdk.Export, repoOwner, repoName, repoRefID string) error {
+	var retryCount int
+	variables := map[string]interface{}{
+		"owner": repoOwner,
+		"name":  repoName,
+	}
+	for {
+		sdk.LogDebug(logger, "running repo project query", "retryCount", retryCount)
+		var result repProjectResult
+		if err := client.Query(repoProjectsQuery, variables, &result); err != nil {
+			if g.checkForAbuseDetection(logger, export, err) {
+				continue
+			}
+			if g.checkForRetryableError(logger, export, err) {
+				retryCount++
+				continue
+			}
+			return err
+		}
+		for _, project := range result.Repository.Projects.Nodes {
+			projectID := sdk.NewWorkProjectID(export.CustomerID(), repoRefID, refType)
+			p := project.ToModel(logger, export.CustomerID(), export.IntegrationInstanceID(), projectID)
+			if p != nil {
+				sdk.LogDebug(logger, "writing repo project", "name", p.Name)
+				if err := export.Pipe().Write(p); err != nil {
+					return err
+				}
+			}
+		}
+		retryCount = 0
+		return nil
+	}
+}
+
 func (g *GithubIntegration) getRepoKey(name string) string {
 	return fmt.Sprintf("repo_cursor_%s", name)
 }
@@ -715,6 +821,15 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 		}
 	}
 
+	// process the work config
+	if err := g.processWorkConfig(config, pipe, state, customerID, instanceID, export.Historical()); err != nil {
+		return err
+	}
+
+	if err := g.processDefaultIssueType(logger, pipe, state, customerID, instanceID, export.Historical()); err != nil {
+		return err
+	}
+
 	for _, node := range therepos {
 		sdk.LogInfo(logger, "processing repo: "+node.Name, "id", node.ID)
 
@@ -731,11 +846,31 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 			continue
 		}
 
-		repo := node.ToModel(customerID, instanceID, r.Login, r.IsPrivate, r.Scope)
+		repo, project := node.ToModel(customerID, instanceID, r.Login, r.IsPrivate, r.Scope)
+
 		previousRepos[node.Name] = repo // remember it
 		if err := pipe.Write(repo); err != nil {
 			return err
 		}
+		if project != nil {
+			if err := pipe.Write(project); err != nil {
+				return err
+			}
+		}
+
+		// write out any labels as issue types
+		for _, labelnode := range node.Labels.Nodes {
+			o, err := labelnode.ToModel(logger, state, customerID, instanceID, export.Historical())
+			if err != nil {
+				return err
+			}
+			if o != nil {
+				if err := pipe.Write(o); err != nil {
+					return err
+				}
+			}
+		}
+
 		for _, predge := range node.Pullrequests.Edges {
 			pullrequest, err := predge.Node.ToModel(logger, userManager, customerID, repo.Name, repo.ID)
 			if err != nil {
@@ -799,6 +934,21 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 			}
 			prCount++
 		}
+
+		if r.HasIssuesEnabled {
+			sdk.LogDebug(logger, "issues enabled for this repo", "name", node.Name)
+			if err := g.fetchAllRepoIssues(logger, client, userManager, export, r.Login, r.RepoName, r.ID, export.Historical()); err != nil {
+				return err
+			}
+		}
+
+		if project != nil && r.HasProjectsEnabled {
+			sdk.LogDebug(logger, "projects enabled for this repo", "name", node.Name)
+			if err := g.fetchRepoProject(logger, client, export, r.Login, r.RepoName, r.ID); err != nil {
+				return err
+			}
+		}
+
 		// save off where we started at so we can page from there in subsequent exports
 		if err := state.Set(g.getRepoKey(repo.Name), node.Pullrequests.PageInfo.StartCursor); err != nil {
 			return fmt.Errorf("error saving repo state: %w", err)
