@@ -233,7 +233,14 @@ func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 				objects = []sdk.Model{obj}
 			}
 		} else {
-			// TODO: issue comments
+			userManager := NewUserManager(webhook.CustomerID(), []string{*v.Repo.Owner.Login}, webhook, webhook.Pipe(), g, webhook.IntegrationInstanceID())
+			obj, err := g.fromIssueCommentEvent(g.logger, client, userManager, webhook, webhook.CustomerID(), webhook.IntegrationInstanceID(), v)
+			if err != nil {
+				return err
+			}
+			if obj != nil {
+				objects = []sdk.Model{obj}
+			}
 		}
 	case *github.RepositoryEvent:
 		repo, project := g.fromRepositoryEvent(g.logger, webhook.IntegrationInstanceID(), webhook.CustomerID(), v)
@@ -245,6 +252,15 @@ func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 			if project != nil {
 				objects = append(objects, project)
 			}
+		}
+	case *github.IssuesEvent:
+		userManager := NewUserManager(webhook.CustomerID(), []string{*v.Repo.Owner.Login}, webhook, webhook.Pipe(), g, webhook.IntegrationInstanceID())
+		issue, err := g.fromIssueEvent(g.logger, userManager, webhook.IntegrationInstanceID(), webhook.CustomerID(), v)
+		if err != nil {
+			return err
+		}
+		if issue != nil {
+			objects = []sdk.Model{issue}
 		}
 	}
 	for _, object := range objects {

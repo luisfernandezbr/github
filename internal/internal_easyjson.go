@@ -4346,8 +4346,6 @@ func easyjson2a877177DecodeGithubComPinptAgentNextGithubInternal45(in *jlexer.Le
 			continue
 		}
 		switch key {
-		case "__typename":
-			out.Typename = string(in.String())
 		case "id":
 			out.ID = string(in.String())
 		case "createdAt":
@@ -4405,13 +4403,8 @@ func easyjson2a877177EncodeGithubComPinptAgentNextGithubInternal45(out *jwriter.
 	first := true
 	_ = first
 	{
-		const prefix string = ",\"__typename\":"
-		out.RawString(prefix[1:])
-		out.String(string(in.Typename))
-	}
-	{
 		const prefix string = ",\"id\":"
-		out.RawString(prefix)
+		out.RawString(prefix[1:])
 		out.String(string(in.ID))
 	}
 	{

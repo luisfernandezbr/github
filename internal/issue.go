@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/go-github/v32/github"
 	"github.com/pinpt/agent.next/sdk"
 )
 
@@ -35,7 +36,6 @@ type commentsNode struct {
 }
 
 type issue struct {
-	Typename  string        `json:"__typename"`
 	ID        string        `json:"id"`
 	CreatedAt time.Time     `json:"createdAt"`
 	UpdatedAt time.Time     `json:"updatedAt"`
@@ -146,6 +146,32 @@ func setIssueType(issue *sdk.WorkIssue, labels []label) {
 	issue.TypeID = sdk.NewWorkIssueTypeID(issue.CustomerID, refType, defaultIssueTypeRefID)
 }
 
+func (g *GithubIntegration) fromIssueEvent(logger sdk.Logger, userManager *UserManager, integrationInstanceID string, customerID string, event *github.IssuesEvent) (*sdk.WorkIssue, error) {
+	var issue issue
+	theIssue := event.Issue
+	issue.ID = theIssue.GetNodeID()
+	issue.CreatedAt = theIssue.GetCreatedAt()
+	issue.UpdatedAt = theIssue.GetUpdatedAt()
+	issue.ClosedAt = theIssue.ClosedAt
+	issue.State = theIssue.GetState()
+	issue.URL = theIssue.GetHTMLURL()
+	issue.Title = theIssue.GetTitle()
+	issue.Body = theIssue.GetBody()
+	issue.Closed = theIssue.GetState() == "CLOSED"
+	issue.Number = theIssue.GetNumber()
+	issue.Author = userToAuthor(theIssue.User)
+	issue.Assignees = assigneesNode{Nodes: make([]author, 0)}
+	for _, a := range theIssue.Assignees {
+		issue.Assignees.Nodes = append(issue.Assignees.Nodes, userToAuthor(a))
+	}
+	issue.Labels = labelNode{Nodes: make([]label, 0)}
+	for _, l := range theIssue.Labels {
+		issue.Labels.Nodes = append(issue.Labels.Nodes, label{ID: l.GetNodeID(), Name: l.GetName()})
+	}
+	projectID := sdk.NewWorkProjectID(customerID, event.Repo.GetNodeID(), refType)
+	return issue.ToModel(logger, userManager, customerID, integrationInstanceID, event.Repo.GetFullName(), projectID)
+}
+
 func (i issue) ToModel(logger sdk.Logger, userManager *UserManager, customerID string, integrationInstanceID string, repoName, projectID string) (*sdk.WorkIssue, error) {
 	var issue sdk.WorkIssue
 	issue.CustomerID = customerID
@@ -187,6 +213,22 @@ func (i issue) ToModel(logger sdk.Logger, userManager *UserManager, customerID s
 }
 
 // TODO: linked_issues for PRs which are linked to an issue
+
+func (g *GithubIntegration) fromIssueCommentEvent(logger sdk.Logger, client sdk.GraphQLClient, userManager *UserManager, control sdk.Control, customerID string, integrationInstanceID string, commentEvent *github.IssueCommentEvent) (*sdk.WorkIssueComment, error) {
+	var comment comment
+	theComment := commentEvent.GetComment()
+	comment.ID = theComment.GetNodeID()
+	comment.CreatedAt = theComment.GetCreatedAt()
+	comment.UpdatedAt = theComment.GetUpdatedAt()
+	comment.Author = userToAuthor(theComment.GetUser())
+	comment.URL = theComment.GetHTMLURL()
+	if theComment.Body != nil {
+		comment.Body = toHTML(theComment.GetBody())
+	}
+	projectID := sdk.NewWorkProjectID(customerID, commentEvent.Repo.GetNodeID(), refType)
+	issueID := sdk.NewWorkIssueID(customerID, commentEvent.Issue.GetNodeID(), refType)
+	return comment.ToModel(logger, userManager, customerID, integrationInstanceID, projectID, issueID)
+}
 
 func (c comment) ToModel(logger sdk.Logger, userManager *UserManager, customerID string, integrationInstanceID string, projectID string, issueID string) (*sdk.WorkIssueComment, error) {
 	var comment sdk.WorkIssueComment
