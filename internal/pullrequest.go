@@ -38,20 +38,6 @@ type pullrequest struct {
 	TimelineItems pullrequestTimelineItems `json:"timelineItems"`
 }
 
-func userToAuthor(user *github.User) author {
-	var author author
-	if user.ID != nil {
-		author.ID = user.GetNodeID()
-	}
-	author.Avatar = user.GetAvatarURL()
-	author.Email = user.GetEmail()
-	author.Login = user.GetLogin()
-	author.Name = user.GetName()
-	author.URL = user.GetHTMLURL()
-	author.Type = "User"
-	return author
-}
-
 func (g *GithubIntegration) fromPullRequestEvent(logger sdk.Logger, client sdk.GraphQLClient, userManager *UserManager, control sdk.Control, customerID string, pr *github.PullRequestEvent) (*sdk.SourceCodePullRequest, error) {
 	var action string
 	if pr.Action != nil {
@@ -149,29 +135,14 @@ func (pr pullrequest) ToModel(logger sdk.Logger, userManager *UserManager, custo
 	if pr.Merged {
 		pullrequest.MergeSha = pr.MergeCommit.Oid
 		pullrequest.MergeCommitID = sdk.NewSourceCodeCommitID(customerID, pr.MergeCommit.Oid, refType, repoID)
-		md, _ := sdk.NewDateWithTime(pr.MergedAt)
-		pullrequest.MergedDate = sdk.SourceCodePullRequestMergedDate{
-			Epoch:   md.Epoch,
-			Rfc3339: md.Rfc3339,
-			Offset:  md.Offset,
-		}
+		sdk.ConvertTimeToDateModel(pr.MergedAt, &pullrequest.MergedDate)
 		pullrequest.MergedByRefID = pr.MergedBy.RefID(customerID)
 		if err := userManager.emitAuthor(logger, pr.MergedBy); err != nil {
 			return nil, err
 		}
 	}
-	cd, _ := sdk.NewDateWithTime(pr.CreatedAt)
-	pullrequest.CreatedDate = sdk.SourceCodePullRequestCreatedDate{
-		Epoch:   cd.Epoch,
-		Rfc3339: cd.Rfc3339,
-		Offset:  cd.Offset,
-	}
-	ud, _ := sdk.NewDateWithTime(pr.UpdatedAt)
-	pullrequest.UpdatedDate = sdk.SourceCodePullRequestUpdatedDate{
-		Epoch:   ud.Epoch,
-		Rfc3339: ud.Rfc3339,
-		Offset:  ud.Offset,
-	}
+	sdk.ConvertTimeToDateModel(pr.CreatedAt, &pullrequest.CreatedDate)
+	sdk.ConvertTimeToDateModel(pr.UpdatedAt, &pullrequest.UpdatedDate)
 	switch pr.State {
 	case "OPEN":
 		if pr.Locked {
@@ -187,11 +158,7 @@ func (pr pullrequest) ToModel(logger sdk.Logger, userManager *UserManager, custo
 			}
 			pullrequest.ClosedByRefID = pr.TimelineItems.Nodes[0].RefID(customerID)
 		}
-		pullrequest.ClosedDate = sdk.SourceCodePullRequestClosedDate{
-			Epoch:   ud.Epoch,
-			Rfc3339: ud.Rfc3339,
-			Offset:  ud.Offset,
-		}
+		sdk.ConvertTimeToDateModel(pr.UpdatedAt, &pullrequest.ClosedDate)
 	case "MERGED":
 		pullrequest.Status = sdk.SourceCodePullRequestStatusMerged
 	}

@@ -190,22 +190,33 @@ func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 		}
 		client = cl
 	}
-	var object sdk.Model
+	// TODO: we should probably hash users in state so we don't emit each time we do something
+	var objects []sdk.Model
 	switch v := obj.(type) {
+	case *github.PushEvent:
+		userManager := NewUserManager(webhook.CustomerID(), []string{*v.Repo.Owner.Login}, webhook, webhook.Pipe(), g, webhook.IntegrationInstanceID())
+		commits, err := g.fromPushEvent(g.logger, client, userManager, webhook, webhook.CustomerID(), v)
+		if err != nil {
+			return err
+		}
+		for _, commit := range commits {
+			objects = append(objects, commit)
+		}
 	case *github.PullRequestEvent:
-		// TODO: we should probably hash users in state so we don't emit each time we do something
 		userManager := NewUserManager(webhook.CustomerID(), []string{*v.Repo.Owner.Login}, webhook, webhook.Pipe(), g, webhook.IntegrationInstanceID())
 		obj, err := g.fromPullRequestEvent(g.logger, client, userManager, webhook, webhook.CustomerID(), v)
 		if err != nil {
 			return err
 		}
 		if obj != nil {
-			object = obj
+			objects = []sdk.Model{obj}
 		}
 	}
-	if object != nil {
+	for _, object := range objects {
 		sdk.LogDebug(g.logger, "sending webhook to pipe", "data", object.Stringify())
-		webhook.Pipe().Write(object)
+		if err := webhook.Pipe().Write(object); err != nil {
+			return err
+		}
 	}
 	return nil
 }

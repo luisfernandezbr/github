@@ -3,6 +3,7 @@ package internal
 import (
 	"strings"
 
+	"github.com/google/go-github/v32/github"
 	"github.com/pinpt/agent.next/sdk"
 )
 
@@ -112,4 +113,25 @@ func (a gitUser) ToModel(customerID string, integrationInstanceID string) *sdk.S
 		user.Type = sdk.SourceCodeUserTypeBot
 	}
 	return user
+}
+
+func userToAuthor(user *github.User) author {
+	var author author
+	if user.ID != nil {
+		author.ID = user.GetNodeID()
+	}
+	author.Avatar = user.GetAvatarURL()
+	author.Email = user.GetEmail()
+	author.Login = user.GetLogin()
+	author.Name = user.GetName()
+	author.URL = user.GetHTMLURL()
+	author.Type = "User"
+	return author
+}
+
+func commitUserToAuthor(user *github.CommitAuthor) gitUser {
+	var author gitUser
+	author.Email = user.GetEmail()
+	author.Name = user.GetName()
+	return author
 }

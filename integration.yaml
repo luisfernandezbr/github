@@ -3,16 +3,17 @@ ref_type: github
 description: This is the official GitHub integration for Pinpoint
 avatar_url: https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png
 capabilities:
+  - agent.Mutation
+  - auth.OAuth2
+  - auth.BasicAuth
   - sourcecode.Repo
   - sourcecode.User
+  - sourcecode.Commit
   - sourcecode.PullRequest
   - sourcecode.PullRequestReview
   - sourcecode.PullRequestCommit
   - sourcecode.PullRequestComment
-  - agent.Mutation
   - web.Hook
-  - auth.OAuth2
-  - auth.BasicAuth
 installation:
   modes:
     - cloud
