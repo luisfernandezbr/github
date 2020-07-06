@@ -63,7 +63,7 @@ agent dev . --log-level=debug --set "apikey_auth={\"apikey\":\"$GITHUB_TOKEN\"}"
 
 Make sure you have the environment variable `GITHUB_TOKEN` set to a GitHub personal access token.  You can also change repositories by updating the `inclusions` array.  The key in the map should be the `organization` login value.
 
-This will run an export for GitHub and save the files to the directory specified by `--dist`.
+This will run an export for GitHub and save the files to the directory specified by `--dir`.
 
 ## Contributions
 

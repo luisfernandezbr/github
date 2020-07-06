@@ -63,6 +63,9 @@ var pullrequestFields = `
 			email
 			name
 		}
+		...on Bot {
+			id
+		}
 	}
 	author {
 		type: __typename
@@ -73,6 +76,9 @@ var pullrequestFields = `
 			id
 			email
 			name
+		}
+		...on Bot {
+			id
 		}
 	}
 	commits(first: 10) {
@@ -99,6 +105,7 @@ var pullrequestFields = `
 						user {
 							id
 							login
+							url
 						}
 					}
 					committer {
@@ -108,6 +115,7 @@ var pullrequestFields = `
 						user {
 							id
 							login
+							url
 						}
 					}
 				}
@@ -138,6 +146,9 @@ var pullrequestFields = `
 						email
 						name
 					}
+					...on Bot {
+						id
+					}
 				}
 			}
 		}
@@ -166,6 +177,9 @@ var pullrequestFields = `
 						id
 						email
 						name
+					}
+					...on Bot {
+						id
 					}
 				}
 			}
@@ -229,6 +243,9 @@ query GetPullRequestComments($name: String!, $owner: String!, $first: Int!, $aft
 								email
 								name
 							}
+							...on Bot {
+								id
+							}
 						}
 					}
 				}
@@ -271,6 +288,9 @@ query GetPullRequestReviews($name: String!, $owner: String!, $first: Int!, $afte
 								id
 								email
 								name
+							}
+							...on Bot {
+								id
 							}
 						}
 					}
@@ -775,7 +795,194 @@ query getIssues($name: String!, $owner: String!, $before: String, $after: String
 					 }
 				  }
 				}
-			}  
+			}
+			timelineItems(first: 100, itemTypes: [ADDED_TO_PROJECT_EVENT, ASSIGNED_EVENT, CLOSED_EVENT, DEMILESTONED_EVENT, LABELED_EVENT, MILESTONED_EVENT, RENAMED_TITLE_EVENT, REOPENED_EVENT, REMOVED_FROM_PROJECT_EVENT, UNASSIGNED_EVENT, UNLABELED_EVENT]) {
+				nodes {
+					__typename
+					... on AddedToProjectEvent {
+						id
+						createdAt
+						actor {
+							type: __typename
+							avatarUrl
+							login
+							url
+							... on User {
+								id
+								email
+								name
+							}
+						}
+					}
+					... on AssignedEvent {
+						id
+						createdAt
+						actor {
+							type: __typename
+							avatarUrl
+							login
+							url
+							... on User {
+								id
+								email
+								name
+							}
+						}
+						assignee {
+							type: __typename
+							... on User {
+								id
+								avatarUrl
+								login
+								email
+								name
+								url
+							}
+							... on Mannequin {
+								id
+								avatarUrl
+								login
+								url
+							}
+							... on Bot {
+								id
+								avatarUrl
+								login
+								url
+							}
+						}
+					}
+					... on ClosedEvent {
+						id
+						createdAt
+						actor {
+							type: __typename
+							avatarUrl
+							login
+							url
+							... on User {
+								id
+								email
+								name
+							}
+						}
+					}
+					... on DemilestonedEvent {
+						id
+						createdAt
+						actor {
+							type: __typename
+							avatarUrl
+							login
+							url
+							... on User {
+								id
+								email
+								name
+							}
+						}
+					}
+					... on MilestonedEvent {
+						id
+						createdAt
+						actor {
+							type: __typename
+							avatarUrl
+							login
+							url
+							... on User {
+								id
+								email
+								name
+							}
+						}
+					}
+					... on LabeledEvent {
+						id
+						createdAt
+						actor {
+							type: __typename
+							avatarUrl
+							login
+							url
+							... on User {
+								id
+								email
+								name
+							}
+						}
+						label {
+							id
+							name
+						}
+					}
+					... on UnlabeledEvent {
+						id
+						createdAt
+						actor {
+							type: __typename
+							avatarUrl
+							login
+							url
+							... on User {
+								id
+								email
+								name
+							}
+						}
+						label {
+							id
+							name
+						}
+					}
+					... on ReopenedEvent {
+						id
+						createdAt
+						actor {
+							type: __typename
+							avatarUrl
+							login
+							url
+							... on User {
+								id
+								email
+								name
+							}
+						}
+					}
+					... on RemovedFromProjectEvent {
+						id
+						createdAt
+						actor {
+							type: __typename
+							avatarUrl
+							login
+							url
+							... on User {
+								id
+								email
+								name
+							}
+						}
+					}
+					... on RenamedTitleEvent {
+						id
+						createdAt
+						actor {
+							type: __typename
+							avatarUrl
+							login
+							url
+							... on User {
+								id
+								email
+								name
+							}
+						}
+						currentTitle
+					}
+				}
+			}
 			assignees(last: 1) {
 			  nodes {
 				 id

@@ -7,7 +7,7 @@ require (
 	github.com/google/go-github/v32 v32.0.0
 	github.com/mailru/easyjson v0.7.1
 	github.com/mattn/go-colorable v0.1.7 // indirect
-	github.com/pinpt/agent.next v0.0.0-20200704184827-331f9bdc5835
+	github.com/pinpt/agent.next v0.0.0-20200705231546-bbe19f571b8b
 	github.com/pinpt/go-common/v10 v10.0.14
 	github.com/pinpt/httpclient v0.0.0-20200627153820-d374c2f15648 // indirect
 	github.com/stretchr/testify v1.6.1

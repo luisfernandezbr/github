@@ -433,7 +433,6 @@ func (g *GithubIntegration) fetchAllRepoMilestones(logger sdk.Logger, client sdk
 		}
 		sdk.LogDebug(logger, "running fetch all repo milestones", "name", repoName, "login", repoLogin, "after", after, "limit", variables["first"], "retryCount", retryCount)
 		var result repositoryMilestonesResult
-		fmt.Println(variables)
 		if err := client.Query(repositoryMilestonesQuery, variables, &result); err != nil {
 			if g.checkForAbuseDetection(logger, export, err) {
 				continue
