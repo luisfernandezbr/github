@@ -10,7 +10,7 @@ import {
 	Graphql,
 	Http
 } from '@pinpt/agent.websdk';
-import styles from './styles.less';
+import styles from './styles.module.less';
 
 const viewerOrgsGQL = `{
 	viewer {
