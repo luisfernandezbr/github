@@ -343,6 +343,7 @@ github.com/pinpt/go-common/v10 v10.0.0 h1:JKbeuEMspdiA3ecD4r5/llTKw60mrIgpzd4Adg
 github.com/pinpt/go-common/v10 v10.0.0/go.mod h1:RnAbLiBmrNNYIKUvp6pnWAtn4f7IRoXa49cFpHmaTFs=
 github.com/pinpt/go-common/v10 v10.0.14 h1:thkW72f3VnN1jiEW6TVFZ0TgD9VkD+9jZSQR/E9A5fw=
 github.com/pinpt/go-common/v10 v10.0.14/go.mod h1:uRe9KzBE26kjqD+2UgreBQqesesXyBUEIjBT2NEK3kk=
+github.com/pinpt/go-datamodel v0.0.1060/go.mod h1:6bZ1Xv1BjlanhlbDw1u7YE/B2kyh51fpYb/5bYtF30k=
 github.com/pinpt/httpclient v0.0.0-20190815022759-09e0028c9067 h1:GG0k6rjX7ywCwYnjVudy3OXXivcMAih8s08+sDrQiEE=
 github.com/pinpt/httpclient v0.0.0-20190815022759-09e0028c9067/go.mod h1:SzzGa0kOT+frqT6ABgV69U9+jlMU98XkmKup+HEZRVI=
 github.com/pinpt/httpclient v0.0.0-20200627153820-d374c2f15648 h1:hkfjX+KJmcSLpFjWqiZtnPIRsJBcOrMdgJD1d5fisB8=

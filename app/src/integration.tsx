@@ -102,7 +102,7 @@ const ShowAccounts = () => {
 	useEffect(() => {
 		if (config.integration_type === IntegrationType.CLOUD) {
 			const fetch = async () => {
-				const data = await fetchViewerOrgs(config.oauth2_auth?.accessToken!);
+				const data = await fetchViewerOrgs(config.oauth2_auth?.access_token!);
 				const orgs = config.accounts || {};
 				config.accounts = orgs;
 				const newaccounts = data.viewer.organizations.nodes.map((org: any) => githubOrgToAccount(org, false));
@@ -150,7 +150,7 @@ const ShowAccounts = () => {
 	 				const val = publicAcct;
 					setPublicAcct('');
 					const login = getEntityName(val);
-	 				fetchOrg(login, config.oauth2_auth?.accessToken!, (account: Account) => {
+	 				fetchOrg(login, config.oauth2_auth?.access_token!, (account: Account) => {
 						const found = accounts.find((acct: Account) => account.id === acct.id);
 						if (found) {
 							return;
@@ -261,11 +261,11 @@ const Integration = () => {
 	const [, setRerender] = useState(0);
 	const currentConfig = useRef(config);
 	useEffect(() => {
-		if (!loading && authorization?.accessToken) {
+		if (!loading && authorization?.access_token) {
 			config.integration_type = IntegrationType.CLOUD;
 			config.oauth2_auth = {
-				accessToken: authorization.accessToken,
-				refreshToken: authorization.refreshToken,
+				access_token: authorization.access_token,
+				refresh_token: authorization.refresh_token,
 				scopes: authorization.scopes,
 				created: authorization.created,
 			};
@@ -286,7 +286,7 @@ const Integration = () => {
 					const profile = JSON.parse(atob(decodeURIComponent(v)));
 					config.integration_type = IntegrationType.CLOUD;
 					config.oauth2_auth = {
-						accessToken: profile.Integration.auth.accessToken,
+						access_token: profile.Integration.auth.accessToken,
 						scopes: profile.Integration.auth.scopes,
 						created: profile.Integration.auth.created,
 					};
