@@ -165,18 +165,18 @@ func (pr pullrequest) ToModel(logger sdk.Logger, userManager *UserManager, custo
 
 func (g *GithubIntegration) updatePullrequest(logger sdk.Logger, config sdk.Config, id string, mutation *sdk.SourcecodePullRequestUpdateMutation, user sdk.MutationUser) error {
 	payload := make(map[string]interface{})
-	if mutation.Title != nil {
-		payload["title"] = *mutation.Title
+	if mutation.Set.Title != nil {
+		payload["title"] = *mutation.Set.Title
 	}
-	if mutation.Description != nil {
-		md, err := sdk.ConvertHTMLToMarkdown(*mutation.Description)
+	if mutation.Set.Description != nil {
+		md, err := sdk.ConvertHTMLToMarkdown(*mutation.Set.Description)
 		if err != nil {
 			return fmt.Errorf("not able to transform body from HTML to Markdown: %w", err)
 		}
 		payload["body"] = md
 	}
-	if mutation.Status != nil {
-		payload["state"] = *mutation.Status
+	if mutation.Set.Status != nil {
+		payload["state"] = *mutation.Set.Status
 	}
 	if len(payload) == 0 {
 		return fmt.Errorf("the mutation failed because invalid value was passed: %s", sdk.Stringify(mutation))
