@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/google/go-github/v32/github"
-	"github.com/pinpt/agent.next/pkg/util"
 	"github.com/pinpt/agent.next/sdk"
 )
 
@@ -170,7 +169,7 @@ func (g *GithubIntegration) updatePullrequest(logger sdk.Logger, config sdk.Conf
 		payload["title"] = *mutation.Title
 	}
 	if mutation.Description != nil {
-		md, err := util.ConvertHTMLToMarkdown(*mutation.Description)
+		md, err := sdk.ConvertHTMLToMarkdown(*mutation.Description)
 		if err != nil {
 			return fmt.Errorf("not able to transform body from HTML to Markdown: %w", err)
 		}

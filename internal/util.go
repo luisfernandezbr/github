@@ -1,7 +1,7 @@
 package internal
 
-import "github.com/pinpt/agent.next/pkg/util"
+import "github.com/pinpt/agent.next/sdk"
 
 func toHTML(markdown string) string {
-	return `<div class="source-github">` + util.ConvertMarkdownToHTML(markdown) + `</div>`
+	return `<div class="source-github">` + sdk.ConvertMarkdownToHTML(markdown) + `</div>`
 }
