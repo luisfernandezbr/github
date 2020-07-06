@@ -10,6 +10,7 @@ import {
 	Graphql,
 	Http
 } from '@pinpt/agent.websdk';
+import styles from './styles.less';
 
 const viewerOrgsGQL = `{
 	viewer {
@@ -167,46 +168,15 @@ const ShowAccounts = () => {
 	);
 };
 
-const chooseIntegrationStyles: any = {
-	container: {
-		fontSize: '1.6rem',
-		display:'flex',
-		alignItems: 'center',
-		justifyContent: 'center',
-		flexDirection: 'row',
-		width: '100%',
-		height: '400px',
-		cursor: 'pointer',
-	},
-	button: {
-		border: '1px solid #eee',
-		backgroundColor: Theme.Blue500,
-		borderRadius: '8px',
-		height: '200px',
-		width: '400px',
-		margin: '2rem',
-		textAlign: 'center',
-		padding: '2rem',
-		color: Theme.Mono100,
-		fontWeight: 'bold',
-		fontSize: '1.7rem',
-	},
-	icon: {
-		fontSize: '10rem',
-		marginBottom: '2rem',
-		color: Theme.Mono100,
-	}
-};
-
 const ChooseIntegrationType = ({ setType }: { setType: (val: IntegrationType) => void }) => {
 	return (
-		<div style={chooseIntegrationStyles.container}>
-			<div style={chooseIntegrationStyles.button} onClick={() => setType(IntegrationType.CLOUD)}>
-				<div><Icon icon={['fas', 'cloud']} style={chooseIntegrationStyles.icon} /></div>
+		<div className={styles.Container}>
+			<div className={styles.Button} onClick={() => setType(IntegrationType.CLOUD)}>
+				<div><Icon icon={['fas', 'cloud']} className={styles.Icon} /></div>
 				<div>I'm using GitHub.com to manage my data using their cloud service</div>
 			</div>
-			<div style={chooseIntegrationStyles.button} onClick={() => setType(IntegrationType.SELFMANAGED)}>
-				<div><Icon icon={['fas', 'home']} style={chooseIntegrationStyles.icon} /></div>
+			<div className={styles.Button} onClick={() => setType(IntegrationType.SELFMANAGED)}>
+				<div><Icon icon={['fas', 'home']} className={styles.Icon} /></div>
 				I'm using GitHub on my own systems or using a third-party managed GitHub service
 			</div>
 		</div>
