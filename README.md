@@ -22,14 +22,14 @@ The following features are supported by this integration:
 | Auth: Basic         |   ✅   |    ✅   |                              |
 | Auth: API Key       |   ✅   |    ✅   |                              |
 | Auth: OAuth2        |   ✅   |    ✅   |                              |
-| Repo                |   ✅   |    ✅   |                              |
+| Repo                |   ✅   |    ✅   | Repo act as a Project        |
 | Pull Request        |   ✅   |    ✅   |                              |
 | Pull Comment        |   ✅   |    ✅   |                              |
 | Pull Request Review |   ✅   |    ✅   |                              |
 | Project             |   ✅   |    ✅   |                              |
 | Epic                |   ✅   |    ✅   | Milestones act as Epics      |
-| Sprint              |   🛑   |    🛑   | Repo projects act as Kanban  |
-| Kanban              |   ✅   |    ✅   |                              |
+| Sprint              |   🛑   |    🛑   |                              |
+| Kanban              |   ✅   |    ✅   | Project acts as Kanban       |
 | Issue               |   ✅   |    ✅   |                              |
 | Issue Comment       |   ✅   |    ✅   |                              |
 | Issue Type          |   ✅   |    ✅   | Built-in labels act as type  |
