@@ -170,13 +170,13 @@ const ShowAccounts = () => {
 
 const ChooseIntegrationType = ({ setType }: { setType: (val: IntegrationType) => void }) => {
 	return (
-		<div className={styles.Container}>
+		<div className={styles.Location}>
 			<div className={styles.Button} onClick={() => setType(IntegrationType.CLOUD)}>
 				<div><Icon icon={['fas', 'cloud']} className={styles.Icon} /></div>
 				<div>I'm using GitHub.com to manage my data using their cloud service</div>
 			</div>
 			<div className={styles.Button} onClick={() => setType(IntegrationType.SELFMANAGED)}>
-				<div><Icon icon={['fas', 'home']} className={styles.Icon} /></div>
+				<div><Icon icon={['fas', 'server']} className={styles.Icon} /></div>
 				I'm using GitHub on my own systems or using a third-party managed GitHub service
 			</div>
 		</div>
@@ -276,7 +276,7 @@ const Integration = () => {
 		}
 	}, [type]);
 	if (loading) {
-		return <Loader />;
+		return <Loader screen />;
 	}
 	if (!config.integration_type) {
 		return <ChooseIntegrationType setType={setType} />;
