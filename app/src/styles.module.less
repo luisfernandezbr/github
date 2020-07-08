@@ -1,10 +1,13 @@
 @import (reference) '~@pinpt/uic.next/theme.less';
 
+.Wrapper {
+	padding: 4.0rem;
+}
+
 .Location {
 	display: flex;
 	justify-content: center;
 	align-items: stretch;
-	padding: 4.0rem;
 	
 	.Button {
 		background: @White;
@@ -18,15 +21,14 @@
 
 		.Icon {
 			font-size: 3.0rem;
-			margin: 0 0 2.0rem;
+			margin: 0 auto 2.0rem;
 			color: @Mono400;
+			display: block;
 		}
 
 		&:hover {
-			background: @Mono100;
-
 			.Icon {
-				color: @Blue500;
+				color: @Royal500;
 			}
 		}
 	}

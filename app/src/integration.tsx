@@ -100,6 +100,8 @@ const fetchViewerOrgs = async(api_key: string) => {
 const ShowAccounts = () => {
 	const { config, setConfig, installed, setInstallEnabled } = useIntegration();
 	const [accounts, setAccounts] = useState<Account[]>([]);
+	const [publicAcct, setPublicAcct] = useState('');
+
 	useEffect(() => {
 		if (config.integration_type === IntegrationType.CLOUD) {
 			const fetch = async () => {
@@ -124,47 +126,15 @@ const ShowAccounts = () => {
 			};
 			fetch();
 		}
-	}, []);
-	const [publicAcct, setPublicAcct] = useState('');
-	const [showAddAccountModal, setShowAddAccountModal] = useState(false);
-	const doShowAddAccountModal = useCallback(() => setShowAddAccountModal(true), []);
+	});
+
 	return (
-		<>
-			<AccountsTable
-				title="The selected accounts will be managed by Pinpoint. All repositories, issues, pull requests and other data will automatically be made available in Pinpoint once installed."
-				accounts={accounts}
-				entity="repo"
-				config={config}
-				button={<span style={{marginLeft: 'auto', marginBottom: '1rem'}}><Button onClick={doShowAddAccountModal}>+ Public Account</Button></span>}
-			/>
-	 		{config.integration_type === IntegrationType.CLOUD && <AskDialog
-	 			textarea={false}
-	 			show={showAddAccountModal}
-	 			title="Add a Public Account"
-	 			text="What is the login or URL to the GitHub account?"
-	 			buttonOK="Add"
-	 			value={publicAcct}
-	 			onCancel={() => setShowAddAccountModal(false)}
-	 			onChange={(val: string) => setPublicAcct(val)}
-	 			onSubmit={() => {
-	 				setShowAddAccountModal(false);
-	 				const val = publicAcct;
-					setPublicAcct('');
-					const login = getEntityName(val);
-	 				fetchOrg(login, config.oauth2_auth?.access_token!, (account: Account) => {
-						const found = accounts.find((acct: Account) => account.id === acct.id);
-						if (found) {
-							return;
-						}
-						const _accounts = [account, ...accounts];
-						setAccounts(_accounts);
-						config.accounts![account.id] = account;
-	 					setInstallEnabled(true);
-	 					setConfig(config);
-	 				});
-				 }}
-			/>}
-		</>
+		<AccountsTable
+			description="For the selected accounts, all repositories, issues, pull requests and other data will automatically be made available in Pinpoint once installed."
+			accounts={accounts}
+			entity="repo"
+			config={config}
+		/>
 	);
 };
 
@@ -172,12 +142,13 @@ const ChooseIntegrationType = ({ setType }: { setType: (val: IntegrationType) =>
 	return (
 		<div className={styles.Location}>
 			<div className={styles.Button} onClick={() => setType(IntegrationType.CLOUD)}>
-				<div><Icon icon={['fas', 'cloud']} className={styles.Icon} /></div>
-				<div>I'm using GitHub.com to manage my data using their cloud service</div>
+				<Icon icon={['fas', 'cloud']} className={styles.Icon} />
+				I'm using the <strong>GitHub.com</strong> cloud service to manage my data
 			</div>
+
 			<div className={styles.Button} onClick={() => setType(IntegrationType.SELFMANAGED)}>
-				<div><Icon icon={['fas', 'server']} className={styles.Icon} /></div>
-				I'm using GitHub on my own systems or using a third-party managed GitHub service
+				<Icon icon={['fas', 'server']} className={styles.Icon} />
+				I'm using <strong>my own systems</strong> or a <strong>third-party</strong> to manage a GitHub service
 			</div>
 		</div>
 	);
@@ -267,6 +238,7 @@ const Integration = () => {
 			});
 		}
 	}, [loading, isFromRedirect, currentURL, config, setRerender, setConfig]);
+
 	useEffect(() => {
 		if (type) {
 			config.integration_type = type;
@@ -275,21 +247,28 @@ const Integration = () => {
 			setRerender(Date.now());
 		}
 	}, [type]);
+
 	if (loading) {
 		return <Loader screen />;
 	}
+
+	let content;
+
 	if (!config.integration_type) {
-		return <ChooseIntegrationType setType={setType} />;
+		content = <ChooseIntegrationType setType={setType} />;
+	} else if (config.integration_type === IntegrationType.CLOUD && !config.oauth2_auth) {
+		content = <OAuthConnect name="GitHub" />;
+	} else if (config.integration_type === IntegrationType.SELFMANAGED && (!config.basic_auth || !config.apikey_auth)) {
+		content = <SelfManagedForm />;
+	} else {
+		content = <ShowAccounts />;
 	}
-	if (config.integration_type === IntegrationType.CLOUD && !config.oauth2_auth) {
-		return <OAuthConnect name="GitHub" />;
-	}
-	if (config.integration_type === IntegrationType.SELFMANAGED && (!config.basic_auth || !config.apikey_auth)) {
-		return <SelfManagedForm />;
-	}
+
 	return (
-		<ShowAccounts />
-	);
+		<div className={styles.Wrapper}>
+			{content}
+		</div>
+	)
 };
 
 export default Integration;
