@@ -32,6 +32,7 @@ func (c pullrequestCommit) ToModel(logger sdk.Logger, userManager *UserManager, 
 	commit.URL = c.URL
 	commit.AuthorRefID = c.Author.RefID(customerID)
 	commit.CommitterRefID = c.Committer.RefID(customerID)
+	commit.Active = true
 	dt, _ := sdk.NewDateWithTime(c.Date)
 	commit.IntegrationInstanceID = sdk.StringPointer(userManager.instanceid)
 	commit.CreatedDate = sdk.SourceCodePullRequestCommitCreatedDate{

@@ -48,6 +48,7 @@ func (r pullrequestreview) ToModel(logger sdk.Logger, userManager *UserManager, 
 	prreview.RepoID = repoID
 	prreview.PullRequestID = prID
 	prreview.URL = r.URL
+	prreview.Active = true
 	cd, _ := sdk.NewDateWithTime(r.CreatedAt)
 	prreview.CreatedDate = sdk.SourceCodePullRequestReviewCreatedDate{
 		Epoch:   cd.Epoch,

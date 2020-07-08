@@ -123,6 +123,7 @@ func (pr pullrequest) ToModel(logger sdk.Logger, userManager *UserManager, custo
 	pullrequest.URL = pr.URL
 	pullrequest.Description = pr.Body
 	pullrequest.Draft = pr.Draft
+	pullrequest.Active = true
 	pullrequest.CreatedByRefID = pr.Author.RefID(customerID)
 	if err := userManager.emitAuthor(logger, pr.Author); err != nil {
 		return nil, err

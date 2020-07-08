@@ -224,7 +224,9 @@ func (i issue) ToModel(logger sdk.Logger, userManager *UserManager, customerID s
 	issue.Title = i.Title
 	issue.Description = toHTML(i.Body)
 	issue.ProjectID = projectID
+	issue.Active = true
 	issue.ID = sdk.NewWorkIssueID(customerID, i.ID, refType)
+	fmt.Println(issue.ID)
 	if len(i.Labels.Nodes) > 0 {
 		issue.Tags = make([]string, 0)
 		for _, l := range i.Labels.Nodes {
