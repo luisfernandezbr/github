@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Icon, Loader, Message } from '@pinpt/uic.next';
+import { Icon, Loader, Error } from '@pinpt/uic.next';
 import {
 	useIntegration,
 	Account,
@@ -131,17 +131,7 @@ const ShowAccounts = () => {
 	}, [installed, setInstallEnabled, config, setConfig]);
 
 	return (processingDetail?.throttled && processingDetail?.throttledUntilDate) ? (
-		<Message icon={<Icon icon={['fas', 'exclamation-triangle']} />}>
-			<>
-				<p>
-					Your authorization token has been throttled by the third-party service.
-				</p>
-
-				<p>
-					Please try again in <strong>{Math.ceil((processingDetail.throttledUntilDate - Date.now()) / 60000)}</strong> minutes.
-				</p>
-			</>
-		</Message>
+		<Error heading="Your authorization token has been throttled by GitHub." message={`Please try again in ${Math.ceil((processingDetail.throttledUntilDate - Date.now()) / 60000)} minutes.`} />
 	) : (
 		<AccountsTable
 			description="For the selected accounts, all repositories, issues, pull requests and other data will automatically be made available in Pinpoint once installed."
