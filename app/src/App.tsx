@@ -21,11 +21,7 @@ function App() {
 		};
 		return <SimulatorInstaller integration={integration} />;
 	}
-	return (
-		<div className="App">
-			<IntegrationUI />
-		</div>
-	);
+	return <IntegrationUI />;
 }
 
 export default App;
