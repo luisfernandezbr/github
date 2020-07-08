@@ -73,6 +73,7 @@ func (g *GithubIntegration) fromPullRequestCommentEvent(logger sdk.Logger, clien
 	comment.UpdatedAt = theComment.GetUpdatedAt()
 	comment.Author = userToAuthor(theComment.GetUser())
 	comment.URL = theComment.GetHTMLURL()
+	// comment.Active = true // FIXME: add
 	if theComment.Body != nil {
 		comment.Body = toHTML(theComment.GetBody())
 	}

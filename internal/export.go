@@ -690,7 +690,7 @@ func (g *GithubIntegration) newGraphClient(logger sdk.Logger, config sdk.Config)
 	} else if config.OAuth2Auth != nil {
 		authToken := config.OAuth2Auth.AccessToken
 		if config.OAuth2Auth.RefreshToken != nil {
-			token, err := g.manager.RefreshOAuth2Token(refType, *config.OAuth2Auth.RefreshToken)
+			token, err := g.manager.AuthManager().RefreshOAuth2Token(refType, *config.OAuth2Auth.RefreshToken)
 			if err != nil {
 				return "", nil, fmt.Errorf("error refreshing oauth2 access token: %w", err)
 			}
@@ -734,7 +734,7 @@ func (g *GithubIntegration) newHTTPClient(logger sdk.Logger, config sdk.Config) 
 	} else if config.OAuth2Auth != nil {
 		authToken := config.OAuth2Auth.AccessToken
 		if config.OAuth2Auth.RefreshToken != nil {
-			token, err := g.manager.RefreshOAuth2Token(refType, *config.OAuth2Auth.RefreshToken)
+			token, err := g.manager.AuthManager().RefreshOAuth2Token(refType, *config.OAuth2Auth.RefreshToken)
 			if err != nil {
 				return "", nil, fmt.Errorf("error refreshing oauth2 access token: %w", err)
 			}

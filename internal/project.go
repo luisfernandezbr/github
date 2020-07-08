@@ -78,6 +78,7 @@ func (p repoProject) ToModel(logger sdk.Logger, customerID string, integrationIn
 	board.RefID = p.ID
 	board.Name = p.Name
 	board.URL = p.URL
+	board.Active = true
 	board.ProjectIds = []string{projectID}
 	board.UpdatedAt = sdk.TimeToEpoch(p.UpdatedAt)
 	board.ID = sdk.NewWorkKanbanBoardID(customerID, board.RefID, refType)

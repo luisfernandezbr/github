@@ -42,7 +42,7 @@ func (g *GithubIntegration) installRepoWebhookIfRequired(customerID string, logg
 		sdk.LogDebug(logger, "webhook is already enabled for this repo", "repo", repo, "org", login)
 		return true, nil
 	}
-	url, err := g.manager.CreateWebHook(customerID, refType, integrationInstanceID, login)
+	url, err := g.manager.WebHookManager().Create(customerID, refType, integrationInstanceID, login, sdk.WebHookScopeRepo)
 	if err != nil {
 		if err.Error() == "webhook: disabled" {
 			sdk.LogInfo(logger, "webhooks are disabled in dev mode")
@@ -142,7 +142,7 @@ func (g *GithubIntegration) registerWebhook(customerID string, state sdk.State, 
 		}
 	}
 	if !found {
-		url, err := g.manager.CreateWebHook(customerID, refType, integrationInstanceID, login)
+		url, err := g.manager.WebHookManager().Create(customerID, refType, integrationInstanceID, login, sdk.WebHookScopeRepo)
 		if err != nil {
 			return fmt.Errorf("error creating webhook url for %s: %w", login, err)
 		}

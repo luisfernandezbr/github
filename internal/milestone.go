@@ -66,6 +66,7 @@ func (m milestone) ToModel(logger sdk.Logger, userManager *UserManager, customer
 	issue.Title = m.Title
 	issue.Description = toHTML(m.Description)
 	issue.ProjectID = projectID
+	issue.Active = true
 	issue.ID = sdk.NewWorkIssueID(customerID, m.ID, refType)
 	sdk.ConvertTimeToDateModel(m.CreatedAt, &issue.CreatedDate)
 	sdk.ConvertTimeToDateModel(m.UpdatedAt, &issue.UpdatedDate)
