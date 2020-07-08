@@ -1,14 +1,12 @@
-import React, { useCallback, useEffect, useState, useRef } from 'react';
-import { Button, Icon, Theme, Loader } from '@pinpt/uic.next';
+import React, { useEffect, useState, useRef } from 'react';
+import { Icon, Loader, Message } from '@pinpt/uic.next';
 import {
 	useIntegration,
 	Account,
 	AccountsTable,
-	AskDialog,
 	IntegrationType,
 	OAuthConnect,
 	Graphql,
-	Http
 } from '@pinpt/agent.websdk';
 import styles from './styles.module.less';
 
@@ -37,18 +35,18 @@ const viewerOrgsGQL = `{
 	}
 }`;
 
-const getEntityName = (val: string) => {
-	let res = val;
-	if (res.charAt(0) === '@') {
-		res = res.substring(1);
-	}
-	if (/https?:/.test(res)) {
-		// looks like a url
-		const i = res.lastIndexOf('/');
-		res = res.substring(i + 1);
-	}
-	return res;
-};
+// const getEntityName = (val: string) => {
+// 	let res = val;
+// 	if (res.charAt(0) === '@') {
+// 		res = res.substring(1);
+// 	}
+// 	if (/https?:/.test(res)) {
+// 		// looks like a url
+// 		const i = res.lastIndexOf('/');
+// 		res = res.substring(i + 1);
+// 	}
+// 	return res;
+// };
 
 const githubUserToAccount = (data: any, isPublic: boolean): Account => {
 	return {
@@ -74,23 +72,23 @@ const githubOrgToAccount = (data: any, isPublic: boolean): Account => {
 	};
 };
 
-const fetchUser = async (name: string, api_key: string, onAdd: (account: Account) => void) => {
-	const [data, status] = await Http.get('https://api.github.com/users/' + getEntityName(name), {Authorization: `Bearer ${api_key}`});
-	if (status === 404) {
-		alert(`User ${name} doesn't exist`);
-		return;
-	}
-	onAdd(githubUserToAccount(data, true));
-};
+// const fetchUser = async (name: string, api_key: string, onAdd: (account: Account) => void) => {
+// 	const [data, status] = await Http.get('https://api.github.com/users/' + getEntityName(name), {Authorization: `Bearer ${api_key}`});
+// 	if (status === 404) {
+// 		alert(`User ${name} doesn't exist`);
+// 		return;
+// 	}
+// 	onAdd(githubUserToAccount(data, true));
+// };
 
-const fetchOrg = async (name: string, api_key: string, onAdd: (account: Account) => void) => {
-	const [data, status] = await Http.get('https://api.github.com/orgs/' + getEntityName(name), {Authorization: `Bearer ${api_key}`});
-	if (status === 404) {
-		fetchUser(name, api_key, onAdd);
-		return;
-	}
-	onAdd(githubOrgToAccount(data, true));
-};
+// const fetchOrg = async (name: string, api_key: string, onAdd: (account: Account) => void) => {
+// 	const [data, status] = await Http.get('https://api.github.com/orgs/' + getEntityName(name), {Authorization: `Bearer ${api_key}`});
+// 	if (status === 404) {
+// 		fetchUser(name, api_key, onAdd);
+// 		return;
+// 	}
+// 	onAdd(githubOrgToAccount(data, true));
+// };
 
 const fetchViewerOrgs = async(api_key: string) => {
 	const [data] = await Graphql.query('https://api.github.com/graphql', viewerOrgsGQL, undefined, {Authorization: `Bearer ${api_key}`});
@@ -98,9 +96,8 @@ const fetchViewerOrgs = async(api_key: string) => {
 };
 
 const ShowAccounts = () => {
-	const { config, setConfig, installed, setInstallEnabled } = useIntegration();
+	const { processingDetail, config, setConfig, installed, setInstallEnabled } = useIntegration();
 	const [accounts, setAccounts] = useState<Account[]>([]);
-	const [publicAcct, setPublicAcct] = useState('');
 
 	useEffect(() => {
 		if (config.integration_type === IntegrationType.CLOUD) {
@@ -110,25 +107,42 @@ const ShowAccounts = () => {
 				config.accounts = orgs;
 				const newaccounts = data.viewer.organizations.nodes.map((org: any) => githubOrgToAccount(org, false));
 				newaccounts.unshift(githubUserToAccount(data.viewer, false));
+
 				if (!installed) {
 					newaccounts.forEach((account: Account) => (orgs[account.id] = account));
 				}
+
 				Object.keys(orgs).forEach((id: string) => {
 					const found = newaccounts.find((acct: Account) => acct.id === id);
+
 					if (!found) {
 						const entry = orgs[id];
 						newaccounts.push(entry);
 					}
 				});
+
 				setAccounts(newaccounts);
 				setInstallEnabled(installed ? true : Object.keys(config.accounts).length > 0);
 				setConfig(config);
 			};
+
 			fetch();
 		}
-	});
+	}, [installed, setInstallEnabled, config, setConfig]);
 
-	return (
+	return (processingDetail?.throttled && processingDetail?.throttledUntilDate) ? (
+		<Message icon={<Icon icon={['fas', 'exclamation-triangle']} />}>
+			<>
+				<p>
+					Your authorization token has been throttled by the third-party service.
+				</p>
+
+				<p>
+					Please try again in <strong>{Math.ceil((processingDetail.throttledUntilDate - Date.now()) / 60000)}</strong> minutes.
+				</p>
+			</>
+		</Message>
+	) : (
 		<AccountsTable
 			description="For the selected accounts, all repositories, issues, pull requests and other data will automatically be made available in Pinpoint once installed."
 			accounts={accounts}
@@ -201,6 +215,7 @@ const Integration = () => {
 	const [type, setType] = useState<IntegrationType | undefined>(config.integration_type);
 	const [, setRerender] = useState(0);
 	const currentConfig = useRef(config);
+
 	useEffect(() => {
 		if (!loading && authorization?.access_token) {
 			config.integration_type = IntegrationType.CLOUD;
@@ -210,19 +225,24 @@ const Integration = () => {
 				scopes: authorization.scopes,
 				created: authorization.created,
 			};
+
 			setType(IntegrationType.CLOUD);
 			setConfig(config);
+
 			currentConfig.current = config;
 		}
-	}, [loading]);
+	}, [loading, authorization, config, setConfig]);
+
 	useEffect(() => {
 		if (!loading && isFromRedirect && currentURL) {
 			const search = currentURL.split('?');
+
 			const tok = search[1].split('&');
 			tok.forEach(token => {
 				const t = token.split('=');
 				const k = t[0];
 				const v = t[1];
+
 				if (k === 'profile') {
 					const profile = JSON.parse(atob(decodeURIComponent(v)));
 					config.integration_type = IntegrationType.CLOUD;
@@ -231,8 +251,10 @@ const Integration = () => {
 						scopes: profile.Integration.auth.scopes,
 						created: profile.Integration.auth.created,
 					};
+
 					setType(IntegrationType.CLOUD);
 					setConfig(config);
+
 					currentConfig.current = config;
 				}
 			});
@@ -243,10 +265,11 @@ const Integration = () => {
 		if (type) {
 			config.integration_type = type;
 			currentConfig.current = config;
+
 			setConfig(config);
 			setRerender(Date.now());
 		}
-	}, [type]);
+	}, [type, config, setConfig]);
 
 	if (loading) {
 		return <Loader screen />;
@@ -263,6 +286,10 @@ const Integration = () => {
 	} else {
 		content = <ShowAccounts />;
 	}
+
+	// Show this if we _require_ reauth;
+	//   if user chooses reauth, just show the normal OAuthConnect
+	// content = <OAuthConnect name="GitHub" reauth />;
 
 	return (
 		<div className={styles.Wrapper}>
