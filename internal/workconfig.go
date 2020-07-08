@@ -12,7 +12,7 @@ func (i *GithubIntegration) processWorkConfig(config sdk.Config, pipe sdk.Pipe, 
 	if historical || !istate.Exists(cacheKeyWorkConfig) {
 		var wc sdk.WorkConfig
 		wc.ID = sdk.NewWorkConfigID(customerID, refType, integrationInstanceID)
-		wc.IntegrationInstanceID = sdk.StringPointer(integrationInstanceID)
+		wc.IntegrationInstanceID = integrationInstanceID
 		wc.CustomerID = customerID
 		wc.RefType = refType
 		wc.Statuses = sdk.WorkConfigStatuses{
