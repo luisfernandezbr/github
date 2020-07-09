@@ -95,7 +95,7 @@ const fetchViewerOrgs = async(api_key: string) => {
 	return data;
 };
 
-const ShowAccounts = () => {
+const AccountList = () => {
 	const { processingDetail, config, setConfig, installed, setInstallEnabled } = useIntegration();
 	const [accounts, setAccounts] = useState<Account[]>([]);
 
@@ -142,7 +142,7 @@ const ShowAccounts = () => {
 	);
 };
 
-const ChooseIntegrationType = ({ setType }: { setType: (val: IntegrationType) => void }) => {
+const LocationSelector = ({ setType }: { setType: (val: IntegrationType) => void }) => {
 	return (
 		<div className={styles.Location}>
 			<div className={styles.Button} onClick={() => setType(IntegrationType.CLOUD)}>
@@ -268,13 +268,13 @@ const Integration = () => {
 	let content;
 
 	if (!config.integration_type) {
-		content = <ChooseIntegrationType setType={setType} />;
+		content = <LocationSelector setType={setType} />;
 	} else if (config.integration_type === IntegrationType.CLOUD && !config.oauth2_auth) {
 		content = <OAuthConnect name="GitHub" />;
 	} else if (config.integration_type === IntegrationType.SELFMANAGED && (!config.basic_auth || !config.apikey_auth)) {
 		content = <SelfManagedForm />;
 	} else {
-		content = <ShowAccounts />;
+		content = <AccountList />;
 	}
 
 	// Show this if we _require_ reauth;
