@@ -201,7 +201,7 @@ const SelfManagedForm = () => {
 	// 	</div>
 	// );
 
-	return <Form type={FormType.API} />;
+	return <Form type={FormType.API} name="GitHub" />;
 
 	// FormType.BASIC = Username + Password
 	// FormType.API = API Token
