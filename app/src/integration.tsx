@@ -7,6 +7,8 @@ import {
 	IntegrationType,
 	OAuthConnect,
 	Graphql,
+	Form,
+	FormType,
 } from '@pinpt/agent.websdk';
 import styles from './styles.module.less';
 
@@ -159,6 +161,7 @@ const LocationSelector = ({ setType }: { setType: (val: IntegrationType) => void
 };
 
 const SelfManagedForm = () => {
+	// TODO
 	// const { setInstallEnabled, setConfig } = useIntegration();
 	// const [url, setURL] = useState(config.selfmanaged?.url);
 	// const [apikey, setAPIKey] = useState(config.selfmanaged?.apikey);
@@ -197,7 +200,11 @@ const SelfManagedForm = () => {
 	// 		</div>
 	// 	</div>
 	// );
-	return <>TODO</>;
+
+	return <Form type={FormType.API} />;
+
+	// FormType.BASIC = Username + Password
+	// FormType.API = API Token
 };
 
 const Integration = () => {
@@ -277,7 +284,7 @@ const Integration = () => {
 		content = <AccountList />;
 	}
 
-	// Show this if we _require_ reauth;
+	// TODO Show this if we _require_ reauth;
 	//   if user chooses reauth, just show the normal OAuthConnect
 	// content = <OAuthConnect name="GitHub" reauth />;
 
