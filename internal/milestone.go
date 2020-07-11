@@ -85,5 +85,17 @@ func (m milestone) ToModel(logger sdk.Logger, userManager *UserManager, customer
 	if err := userManager.emitAuthor(logger, m.Creator); err != nil {
 		return nil, err
 	}
+	issue.Transitions = make([]sdk.WorkIssueTransitions, 0)
+	if m.Closed {
+		issue.Transitions = append(issue.Transitions, sdk.WorkIssueTransitions{
+			RefID: "open",
+			Name:  "Open",
+		})
+	} else {
+		issue.Transitions = append(issue.Transitions, sdk.WorkIssueTransitions{
+			RefID: "close",
+			Name:  "Close",
+		})
+	}
 	return &issue, nil
 }

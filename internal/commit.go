@@ -10,6 +10,7 @@ func (g *GithubIntegration) fromPushEvent(logger sdk.Logger, client sdk.GraphQLC
 	for _, c := range push.Commits {
 		var commit sdk.SourceCodeCommit
 		commit.CustomerID = customerID
+		commit.Active = true
 		commit.RefType = refType
 		commit.RefID = c.GetID()
 		sha := c.GetSHA()

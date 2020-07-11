@@ -33,7 +33,6 @@ func (g *GithubIntegration) Start(logger sdk.Logger, config sdk.Config, manager 
 func (g *GithubIntegration) Enroll(instance sdk.Instance) error {
 	// attempt to add an org level web hook
 	config := instance.Config()
-	state := instance.State()
 	if config.IntegrationType == sdk.CloudIntegration && config.OAuth2Auth != nil {
 		_, client, err := g.newHTTPClient(g.logger, config)
 		if err != nil {
@@ -41,7 +40,7 @@ func (g *GithubIntegration) Enroll(instance sdk.Instance) error {
 		}
 		for login, acct := range *config.Accounts {
 			if acct.Type == sdk.ConfigAccountTypeOrg {
-				if err := g.registerWebhook(instance.CustomerID(), state, client, login, instance.IntegrationInstanceID(), "/orgs/"+login+"/hooks"); err != nil {
+				if err := g.registerOrgWebhook(g.manager.WebHookManager(), client, instance.CustomerID(), instance.IntegrationInstanceID(), login); err != nil {
 					return fmt.Errorf("error creating webhook. %w", err)
 				}
 			}
@@ -60,7 +59,7 @@ func (g *GithubIntegration) Dismiss(instance sdk.Instance) error {
 		}
 		for login, acct := range *config.Accounts {
 			if acct.Type == sdk.ConfigAccountTypeOrg {
-				if err := g.unregisterWebhook(instance.State(), client, login, instance.IntegrationInstanceID(), "/orgs/"+login+"/hooks"); err != nil {
+				if err := g.unregisterOrgWebhook(g.manager.WebHookManager(), client, instance.CustomerID(), instance.IntegrationInstanceID(), login); err != nil {
 					sdk.LogError(g.logger, "error unregistering webhook", "login", login, "err", err)
 				}
 			}

@@ -70,33 +70,47 @@ func getProjectIDfromURL(url string) int {
 	return int(num)
 }
 
-func (p repoProject) ToModel(logger sdk.Logger, customerID string, integrationInstanceID string, projectID string) *sdk.WorkKanbanBoard {
-	var board sdk.WorkKanbanBoard
+func (p repoProject) ToModel(logger sdk.Logger, customerID string, integrationInstanceID string, projectID string) (*sdk.AgileBoard, *sdk.AgileKanban) {
+	var board sdk.AgileBoard
 	board.CustomerID = customerID
 	board.IntegrationInstanceID = sdk.StringPointer(integrationInstanceID)
 	board.RefType = refType
 	board.RefID = p.ID
 	board.Name = p.Name
-	board.URL = p.URL
 	board.Active = true
-	board.ProjectIds = []string{projectID}
 	board.UpdatedAt = sdk.TimeToEpoch(p.UpdatedAt)
-	board.ID = sdk.NewWorkKanbanBoardID(customerID, board.RefID, refType)
-	board.Columns = make([]sdk.WorkKanbanBoardColumns, 0)
-	board.IssueIds = make([]string, 0)
-	// TODO: should the backlog just be all issues that aren't on the board?
+	board.ID = sdk.NewAgileBoardID(customerID, p.ID, refType)
+	board.Columns = make([]sdk.AgileBoardColumns, 0)
+	board.Type = sdk.AgileBoardTypeKanban
+
+	var kanban sdk.AgileKanban
+	kanban.CustomerID = customerID
+	kanban.IntegrationInstanceID = sdk.StringPointer(integrationInstanceID)
+	kanban.RefType = refType
+	kanban.RefID = p.ID
+	kanban.Active = true
+	kanban.URL = p.URL
+	kanban.BoardID = board.ID
+	kanban.UpdatedAt = sdk.TimeToEpoch(p.UpdatedAt)
+	kanban.ID = sdk.NewAgileKanbanID(customerID, p.ID, refType)
+	kanban.Columns = make([]sdk.AgileKanbanColumns, 0)
+	kanban.IssueIds = make([]string, 0)
+
 	for _, c := range p.Columns.Nodes {
-		var col sdk.WorkKanbanBoardColumns
+		var col sdk.AgileKanbanColumns
 		col.Name = c.Name
 		col.IssueIds = make([]string, 0)
 		for _, o := range c.Cards.Nodes {
 			id := sdk.NewWorkIssueID(customerID, o.Content.ID, refType)
 			col.IssueIds = append(col.IssueIds, id)
-			board.IssueIds = append(board.IssueIds, id)
+			kanban.IssueIds = append(kanban.IssueIds, id)
 		}
-		board.Columns = append(board.Columns, col)
+		kanban.Columns = append(kanban.Columns, col)
+		var bcol sdk.AgileBoardColumns
+		bcol.Name = c.Name
+		board.Columns = append(board.Columns, bcol)
 	}
-	return &board
+	return &board, &kanban
 }
 
 func (r repository) ToProjectModel(repo *sdk.SourceCodeRepo) *sdk.WorkProject {
@@ -104,6 +118,7 @@ func (r repository) ToProjectModel(repo *sdk.SourceCodeRepo) *sdk.WorkProject {
 		return nil
 	}
 	var project sdk.WorkProject
+	project.Active = true
 	project.ID = sdk.NewWorkProjectID(repo.CustomerID, repo.RefID, refType)
 	project.RefType = refType
 	project.RefID = repo.RefID
@@ -116,5 +131,56 @@ func (r repository) ToProjectModel(repo *sdk.SourceCodeRepo) *sdk.WorkProject {
 	project.IntegrationInstanceID = repo.IntegrationInstanceID
 	project.CustomerID = repo.CustomerID
 	project.UpdatedAt = repo.UpdatedAt
+	project.IssueTypes = []sdk.WorkProjectIssueTypes{
+		sdk.WorkProjectIssueTypes{
+			Name:  "Epic",
+			RefID: "epic",
+		},
+		sdk.WorkProjectIssueTypes{
+			Name:  "Task",
+			RefID: "task",
+		},
+		sdk.WorkProjectIssueTypes{
+			Name:  "Bug",
+			RefID: "bug",
+		},
+		sdk.WorkProjectIssueTypes{
+			Name:  "Enhancement",
+			RefID: "enhancement",
+		},
+	}
 	return &project
+}
+
+const projectCapabilityCacheKeyPrefix = "project_capability_"
+
+func (r repository) ToProjectCapabilityModel(state sdk.State, repo *sdk.SourceCodeRepo, historical bool) *sdk.WorkProjectCapability {
+	if !r.HasIssues {
+		return nil
+	}
+	var cacheKey = projectCapabilityCacheKeyPrefix + repo.ID
+	if !historical && state.Exists(cacheKey) {
+		return nil
+	}
+	var capability sdk.WorkProjectCapability
+	capability.CustomerID = repo.CustomerID
+	capability.RefID = repo.RefID
+	capability.RefType = repo.RefType
+	capability.IntegrationInstanceID = repo.IntegrationInstanceID
+	capability.ProjectID = repo.ID
+	capability.UpdatedAt = repo.UpdatedAt
+	capability.Attachments = false
+	capability.ChangeLogs = false
+	capability.DueDates = false
+	capability.Epics = true
+	capability.InProgressStates = false
+	capability.KanbanBoards = r.HasProjects
+	capability.LinkedIssues = true
+	capability.Parents = true
+	capability.Priorities = false
+	capability.Resolutions = false
+	capability.Sprints = false
+	capability.StoryPoints = false
+	state.SetWithExpires(cacheKey, 1, time.Hour*24*30)
+	return &capability
 }

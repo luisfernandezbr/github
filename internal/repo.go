@@ -26,7 +26,7 @@ type repository struct {
 	} `json:"owner"`
 }
 
-func (g *GithubIntegration) fromRepositoryEvent(logger sdk.Logger, integrationInstanceID string, customerID string, event *github.RepositoryEvent) (*sdk.SourceCodeRepo, *sdk.WorkProject) {
+func (g *GithubIntegration) fromRepositoryEvent(logger sdk.Logger, state sdk.State, integrationInstanceID string, customerID string, event *github.RepositoryEvent) (*sdk.SourceCodeRepo, *sdk.WorkProject, *sdk.WorkProjectCapability) {
 	var repo repository
 	theRepo := event.GetRepo()
 	login := getRepoOwnerLogin(theRepo)
@@ -49,10 +49,10 @@ func (g *GithubIntegration) fromRepositoryEvent(logger sdk.Logger, integrationIn
 	repo.HasProjects = theRepo.GetHasProjects()
 	repo.Owner.Login = login
 	isPrivate := theRepo.GetPrivate()
-	return repo.ToModel(customerID, integrationInstanceID, login, isPrivate, scope)
+	return repo.ToModel(state, false, customerID, integrationInstanceID, login, isPrivate, scope)
 }
 
-func (r repository) ToModel(customerID string, integrationInstanceID string, login string, isPrivate bool, scope sdk.ConfigAccountType) (*sdk.SourceCodeRepo, *sdk.WorkProject) {
+func (r repository) ToModel(state sdk.State, historical bool, customerID string, integrationInstanceID string, login string, isPrivate bool, scope sdk.ConfigAccountType) (*sdk.SourceCodeRepo, *sdk.WorkProject, *sdk.WorkProjectCapability) {
 	repo := &sdk.SourceCodeRepo{}
 	repo.ID = sdk.NewSourceCodeRepoID(customerID, repo.ID, refType)
 	repo.CustomerID = customerID
@@ -82,7 +82,7 @@ func (r repository) ToModel(customerID string, integrationInstanceID string, log
 	}
 
 	// since a repo can also possibly be a work project, try and create it too
-	return repo, r.ToProjectModel(repo)
+	return repo, r.ToProjectModel(repo), r.ToProjectCapabilityModel(state, repo, historical)
 }
 
 func getRepoOwnerLogin(repo *github.Repository) string {

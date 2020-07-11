@@ -40,20 +40,12 @@ type issueMilestone struct {
 }
 
 type timelineItem struct {
-	ID        string    `json:"id"`
-	Type      string    `json:"__typename"`
-	CreatedAt time.Time `json:"createdAt"`
-	Actor     author    `json:"actor"`
-	// these are optional based on the event
-	Assignee *author `json:"assignee,omitempty"`
-	Label    *label  `json:"label,omitempty"`
-	Title    *string `json:"currentTitle,omitempty"`
+	Actor author `json:"actor"`
 }
 
 type timelineItems struct {
 	Nodes []timelineItem `json:"nodes"`
 }
-
 type issue struct {
 	ID        string          `json:"id"`
 	CreatedAt time.Time       `json:"createdAt"`
@@ -70,7 +62,6 @@ type issue struct {
 	Author    author          `json:"author"`
 	Number    int             `json:"number"`
 	Milestone *issueMilestone `json:"milestone"`
-	Timeline  *timelineItems  `json:"timelineItems"`
 }
 
 type issueNode struct {
@@ -226,7 +217,6 @@ func (i issue) ToModel(logger sdk.Logger, userManager *UserManager, customerID s
 	issue.ProjectID = projectID
 	issue.Active = true
 	issue.ID = sdk.NewWorkIssueID(customerID, i.ID, refType)
-	fmt.Println(issue.ID)
 	if len(i.Labels.Nodes) > 0 {
 		issue.Tags = make([]string, 0)
 		for _, l := range i.Labels.Nodes {
@@ -255,59 +245,17 @@ func (i issue) ToModel(logger sdk.Logger, userManager *UserManager, customerID s
 	if i.Milestone != nil {
 		issue.ParentID = sdk.NewWorkIssueID(customerID, i.Milestone.ID, refType)
 	}
-	if i.Timeline != nil {
-		// the changelog should be in the order from OLDEST to NEWEST
-		issue.ChangeLog = make([]sdk.WorkIssueChangeLog, 0)
-		var previousTitle, previousAssignee string
-		for ordinal, node := range i.Timeline.Nodes {
-			var changelog sdk.WorkIssueChangeLog
-			sdk.ConvertTimeToDateModel(node.CreatedAt, &changelog.CreatedDate)
-			changelog.Ordinal = int64(ordinal)
-			changelog.UserID = node.Actor.RefID(customerID)
-			changelog.RefID = node.ID
-			if err := userManager.emitAuthor(logger, node.Actor); err != nil {
-				return nil, err
-			}
-			switch node.Type {
-			case "AssignedEvent":
-				changelog.Field = sdk.WorkIssueChangeLogFieldAssigneeRefID
-				changelog.From = previousAssignee
-				changelog.To = node.Assignee.RefID(customerID)
-				changelog.ToString = node.Assignee.Name
-				previousAssignee = changelog.To
-				if err := userManager.emitAuthor(logger, *node.Assignee); err != nil {
-					return nil, err
-				}
-			case "UnassignedEvent":
-				changelog.Field = sdk.WorkIssueChangeLogFieldAssigneeRefID
-				changelog.From = previousAssignee
-				previousAssignee = ""
-			case "LabeledEvent":
-			case "UnlabeledEvent":
-			case "MilestonedEvent":
-				changelog.Field = sdk.WorkIssueChangeLogFieldEpicID
-			case "DemilestonedEvent":
-				changelog.Field = sdk.WorkIssueChangeLogFieldEpicID
-			case "RenamedTitleEvent":
-				changelog.Field = sdk.WorkIssueChangeLogFieldTitle
-				if node.Title != nil {
-					changelog.From = previousTitle
-					changelog.To = *node.Title
-					previousTitle = *node.Title
-				} else {
-					previousTitle = ""
-				}
-			case "AddedToProjectEvent":
-				changelog.Field = sdk.WorkIssueChangeLogFieldProjectID
-			case "RemovedFromProjectEvent":
-				changelog.Field = sdk.WorkIssueChangeLogFieldProjectID
-			case "ClosedEvent":
-				continue // currently no-op
-			case "ReopenedEvent":
-				continue // currently no-op
-			}
-			issue.ChangeLog = append(issue.ChangeLog, changelog)
-		}
+	issue.Transitions = make([]sdk.WorkIssueTransitions, 0)
+	if i.Closed {
+		issue.Transitions = append(issue.Transitions, sdk.WorkIssueTransitions{
+			RefID: "open",
+			Name:  "Open",
+		})
+	} else {
+		issue.Transitions = append(issue.Transitions, sdk.WorkIssueTransitions{
+			RefID: "close",
+			Name:  "Close",
+		})
 	}
 	return &issue, nil
 }
@@ -333,6 +281,7 @@ func (g *GithubIntegration) fromIssueCommentEvent(logger sdk.Logger, client sdk.
 func (c comment) ToModel(logger sdk.Logger, userManager *UserManager, customerID string, integrationInstanceID string, projectID string, issueID string) (*sdk.WorkIssueComment, error) {
 	var comment sdk.WorkIssueComment
 	comment.CustomerID = customerID
+	comment.Active = true
 	comment.RefID = c.ID
 	comment.RefType = refType
 	comment.IntegrationInstanceID = sdk.StringPointer(integrationInstanceID)

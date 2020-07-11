@@ -102,6 +102,11 @@ func (w *testWebhook) Resumed() error {
 	return nil
 }
 
+// Scope is the registered webhook scope
+func (w *testWebhook) Scope() sdk.WebHookScope {
+	return sdk.WebHookScopeOrg
+}
+
 type testGraphqlClient struct {
 	res interface{}
 }

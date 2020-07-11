@@ -564,9 +564,15 @@ func (g *GithubIntegration) fetchRepoProject(logger sdk.Logger, client sdk.Graph
 			return err
 		}
 		projectID := sdk.NewWorkProjectID(customerID, repoRefID, refType)
-		p := result.Repository.Project.ToModel(logger, customerID, integrationInstanceID, projectID)
+		b, p := result.Repository.Project.ToModel(logger, customerID, integrationInstanceID, projectID)
+		if b != nil {
+			sdk.LogDebug(logger, "writing repo board", "name", repoName)
+			if err := pipe.Write(b); err != nil {
+				return err
+			}
+		}
 		if p != nil {
-			sdk.LogDebug(logger, "writing repo project", "name", p.Name)
+			sdk.LogDebug(logger, "writing repo project", "name", repoName)
 			if err := pipe.Write(p); err != nil {
 				return err
 			}
@@ -597,9 +603,15 @@ func (g *GithubIntegration) fetchRepoProjects(logger sdk.Logger, client sdk.Grap
 		}
 		for _, project := range result.Repository.Projects.Nodes {
 			projectID := sdk.NewWorkProjectID(export.CustomerID(), repoRefID, refType)
-			p := project.ToModel(logger, export.CustomerID(), export.IntegrationInstanceID(), projectID)
+			b, p := project.ToModel(logger, export.CustomerID(), export.IntegrationInstanceID(), projectID)
+			if b != nil {
+				sdk.LogDebug(logger, "writing repo board", "name", project.Name)
+				if err := export.Pipe().Write(b); err != nil {
+					return err
+				}
+			}
 			if p != nil {
-				sdk.LogDebug(logger, "writing repo project", "name", p.Name)
+				sdk.LogDebug(logger, "writing repo project", "name", project.Name)
 				if err := export.Pipe().Write(p); err != nil {
 					return err
 				}
@@ -912,7 +924,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 				}
 				// remove the webhook
 				r := repos[repo.Name]
-				g.uninstallRepoWebhook(state, httpclient, r.Login, instanceID, repo.Name)
+				g.uninstallRepoWebhook(g.manager.WebHookManager(), httpclient, customerID, instanceID, r.Login, repo.Name, r.ID)
 			}
 		}
 	}
@@ -932,17 +944,18 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 		repoCount++
 		r := repos[node.Name]
 
-		hookInstalled, err := g.installRepoWebhookIfRequired(customerID, logger, state, httpclient, r.Login, instanceID, node.Name)
+		hookInstalled, err := g.installRepoWebhookIfRequired(g.manager.WebHookManager(), logger, httpclient, customerID, instanceID, r.Login, r.RepoName, r.ID)
 		if err != nil {
 			return err
 		}
+
 		if hookInstalled && !export.Historical() {
 			// if the hook is installed this isn't a historical, we can skip processing this repo
 			sdk.LogDebug(logger, "skipping repo since a webhook is already installed and not historical", "name", node.Name, "id", node.ID)
 			continue
 		}
 
-		repo, project := node.ToModel(customerID, instanceID, r.Login, r.IsPrivate, r.Scope)
+		repo, project, capability := node.ToModel(export.State(), export.Historical(), customerID, instanceID, r.Login, r.IsPrivate, r.Scope)
 
 		previousRepos[node.Name] = repo // remember it
 		if err := pipe.Write(repo); err != nil {
@@ -950,6 +963,11 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 		}
 		if project != nil {
 			if err := pipe.Write(project); err != nil {
+				return err
+			}
+		}
+		if capability != nil {
+			if err := pipe.Write(capability); err != nil {
 				return err
 			}
 		}

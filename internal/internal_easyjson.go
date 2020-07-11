@@ -39,6 +39,8 @@ func easyjson2a877177DecodeGithubComPinptAgentNextGithubInternal(in *jlexer.Lexe
 		switch key {
 		case "id":
 			out.ID = int64(in.Int64())
+		case "name":
+			out.Name = string(in.String())
 		case "url":
 			out.URL = string(in.String())
 		case "active":
@@ -61,6 +63,11 @@ func easyjson2a877177EncodeGithubComPinptAgentNextGithubInternal(out *jwriter.Wr
 		const prefix string = ",\"id\":"
 		out.RawString(prefix[1:])
 		out.Int64(int64(in.ID))
+	}
+	{
+		const prefix string = ",\"name\":"
+		out.RawString(prefix)
+		out.String(string(in.Name))
 	}
 	{
 		const prefix string = ",\"url\":"
@@ -327,46 +334,8 @@ func easyjson2a877177DecodeGithubComPinptAgentNextGithubInternal3(in *jlexer.Lex
 			continue
 		}
 		switch key {
-		case "id":
-			out.ID = string(in.String())
-		case "__typename":
-			out.Type = string(in.String())
-		case "createdAt":
-			if data := in.Raw(); in.Ok() {
-				in.AddError((out.CreatedAt).UnmarshalJSON(data))
-			}
 		case "actor":
 			(out.Actor).UnmarshalEasyJSON(in)
-		case "assignee":
-			if in.IsNull() {
-				in.Skip()
-				out.Assignee = nil
-			} else {
-				if out.Assignee == nil {
-					out.Assignee = new(author)
-				}
-				(*out.Assignee).UnmarshalEasyJSON(in)
-			}
-		case "label":
-			if in.IsNull() {
-				in.Skip()
-				out.Label = nil
-			} else {
-				if out.Label == nil {
-					out.Label = new(label)
-				}
-				(*out.Label).UnmarshalEasyJSON(in)
-			}
-		case "currentTitle":
-			if in.IsNull() {
-				in.Skip()
-				out.Title = nil
-			} else {
-				if out.Title == nil {
-					out.Title = new(string)
-				}
-				*out.Title = string(in.String())
-			}
 		default:
 			in.SkipRecursive()
 		}
@@ -382,39 +351,9 @@ func easyjson2a877177EncodeGithubComPinptAgentNextGithubInternal3(out *jwriter.W
 	first := true
 	_ = first
 	{
-		const prefix string = ",\"id\":"
-		out.RawString(prefix[1:])
-		out.String(string(in.ID))
-	}
-	{
-		const prefix string = ",\"__typename\":"
-		out.RawString(prefix)
-		out.String(string(in.Type))
-	}
-	{
-		const prefix string = ",\"createdAt\":"
-		out.RawString(prefix)
-		out.Raw((in.CreatedAt).MarshalJSON())
-	}
-	{
 		const prefix string = ",\"actor\":"
-		out.RawString(prefix)
+		out.RawString(prefix[1:])
 		(in.Actor).MarshalEasyJSON(out)
-	}
-	if in.Assignee != nil {
-		const prefix string = ",\"assignee\":"
-		out.RawString(prefix)
-		(*in.Assignee).MarshalEasyJSON(out)
-	}
-	if in.Label != nil {
-		const prefix string = ",\"label\":"
-		out.RawString(prefix)
-		(*in.Label).MarshalEasyJSON(out)
-	}
-	if in.Title != nil {
-		const prefix string = ",\"currentTitle\":"
-		out.RawString(prefix)
-		out.String(string(*in.Title))
 	}
 	out.RawByte('}')
 }
@@ -5216,16 +5155,6 @@ func easyjson2a877177DecodeGithubComPinptAgentNextGithubInternal52(in *jlexer.Le
 				}
 				(*out.Milestone).UnmarshalEasyJSON(in)
 			}
-		case "timelineItems":
-			if in.IsNull() {
-				in.Skip()
-				out.Timeline = nil
-			} else {
-				if out.Timeline == nil {
-					out.Timeline = new(timelineItems)
-				}
-				(*out.Timeline).UnmarshalEasyJSON(in)
-			}
 		default:
 			in.SkipRecursive()
 		}
@@ -5321,15 +5250,6 @@ func easyjson2a877177EncodeGithubComPinptAgentNextGithubInternal52(out *jwriter.
 			out.RawString("null")
 		} else {
 			(*in.Milestone).MarshalEasyJSON(out)
-		}
-	}
-	{
-		const prefix string = ",\"timelineItems\":"
-		out.RawString(prefix)
-		if in.Timeline == nil {
-			out.RawString("null")
-		} else {
-			(*in.Timeline).MarshalEasyJSON(out)
 		}
 	}
 	out.RawByte('}')
