@@ -7,6 +7,8 @@ import {
 	IntegrationType,
 	OAuthConnect,
 	Graphql,
+	Form,
+	FormType,
 } from '@pinpt/agent.websdk';
 import styles from './styles.module.less';
 
@@ -95,7 +97,7 @@ const fetchViewerOrgs = async(api_key: string) => {
 	return data;
 };
 
-const ShowAccounts = () => {
+const AccountList = () => {
 	const { processingDetail, config, setConfig, installed, setInstallEnabled } = useIntegration();
 	const [accounts, setAccounts] = useState<Account[]>([]);
 
@@ -142,7 +144,7 @@ const ShowAccounts = () => {
 	);
 };
 
-const ChooseIntegrationType = ({ setType }: { setType: (val: IntegrationType) => void }) => {
+const LocationSelector = ({ setType }: { setType: (val: IntegrationType) => void }) => {
 	return (
 		<div className={styles.Location}>
 			<div className={styles.Button} onClick={() => setType(IntegrationType.CLOUD)}>
@@ -159,6 +161,7 @@ const ChooseIntegrationType = ({ setType }: { setType: (val: IntegrationType) =>
 };
 
 const SelfManagedForm = () => {
+	// TODO
 	// const { setInstallEnabled, setConfig } = useIntegration();
 	// const [url, setURL] = useState(config.selfmanaged?.url);
 	// const [apikey, setAPIKey] = useState(config.selfmanaged?.apikey);
@@ -197,7 +200,11 @@ const SelfManagedForm = () => {
 	// 		</div>
 	// 	</div>
 	// );
-	return <>TODO</>;
+
+	return <Form type={FormType.API} name="GitHub" />;
+
+	// FormType.BASIC = Username + Password
+	// FormType.API = API Token
 };
 
 const Integration = () => {
@@ -268,16 +275,16 @@ const Integration = () => {
 	let content;
 
 	if (!config.integration_type) {
-		content = <ChooseIntegrationType setType={setType} />;
+		content = <LocationSelector setType={setType} />;
 	} else if (config.integration_type === IntegrationType.CLOUD && !config.oauth2_auth) {
 		content = <OAuthConnect name="GitHub" />;
 	} else if (config.integration_type === IntegrationType.SELFMANAGED && (!config.basic_auth || !config.apikey_auth)) {
 		content = <SelfManagedForm />;
 	} else {
-		content = <ShowAccounts />;
+		content = <AccountList />;
 	}
 
-	// Show this if we _require_ reauth;
+	// TODO Show this if we _require_ reauth;
 	//   if user chooses reauth, just show the normal OAuthConnect
 	// content = <OAuthConnect name="GitHub" reauth />;
 
