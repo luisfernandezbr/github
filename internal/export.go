@@ -633,7 +633,7 @@ func (g *GithubIntegration) fetchRepos(logger sdk.Logger, client sdk.GraphQLClie
 	results := make([]repository, 0)
 	var retryCount int
 	var offset int
-	const max = 10
+	const max = 5
 	state := export.State()
 	for offset < len(repos) {
 		sdk.LogDebug(logger, "running repo query", "retryCount", retryCount, "offset", offset, "length", len(repos))
@@ -680,10 +680,10 @@ func (g *GithubIntegration) fetchRepos(logger sdk.Logger, client sdk.GraphQLClie
 					return nil, err
 				}
 				results = append(results, repo)
+				offset++
 			}
 		}
 		retryCount = 0
-		offset += len(repos)
 	}
 	sdk.LogInfo(logger, "returning from fetchRepos", "len", len(results))
 	return results, nil
