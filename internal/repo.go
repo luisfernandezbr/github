@@ -54,7 +54,7 @@ func (g *GithubIntegration) fromRepositoryEvent(logger sdk.Logger, state sdk.Sta
 
 func (r repository) ToModel(state sdk.State, historical bool, customerID string, integrationInstanceID string, login string, isPrivate bool, scope sdk.ConfigAccountType) (*sdk.SourceCodeRepo, *sdk.WorkProject, *sdk.WorkProjectCapability) {
 	repo := &sdk.SourceCodeRepo{}
-	repo.ID = sdk.NewSourceCodeRepoID(customerID, repo.ID, refType)
+	repo.ID = sdk.NewSourceCodeRepoID(customerID, r.ID, refType)
 	repo.CustomerID = customerID
 	repo.Name = r.Name
 	repo.Description = r.Description

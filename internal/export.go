@@ -288,10 +288,12 @@ func (g *GithubIntegration) queuePullRequestReviewsJob(logger sdk.Logger, client
 		sdk.LogInfo(logger, "need to run a pull request reviews job starting from "+cursor, "name", repoName, "owner", repoOwner)
 		var variables = map[string]interface{}{
 			"first":  defaultPageSize,
-			"after":  cursor,
 			"owner":  repoOwner,
 			"name":   repoName,
 			"number": prNumber,
+		}
+		if cursor != "" {
+			variables["after"] = cursor
 		}
 		customerID := export.CustomerID()
 		fullname := repoOwner + "/" + repoName
@@ -320,7 +322,7 @@ func (g *GithubIntegration) queuePullRequestReviewsJob(logger sdk.Logger, client
 					}
 					continue
 				}
-				return err
+				return fmt.Errorf("error fetching pull request reviews: %w", err)
 			}
 			g.lock.Unlock()
 			retryCount = 0
@@ -385,6 +387,7 @@ func (g *GithubIntegration) fetchAllRepos(logger sdk.Logger, client sdk.GraphQLC
 		}
 		after = result.Data.Repositories.PageInfo.EndCursor
 	}
+	sdk.LogDebug(logger, "returning from fetch all repos", "count", len(repos))
 	return repos, nil
 }
 
@@ -649,8 +652,8 @@ func (g *GithubIntegration) fetchRepos(logger sdk.Logger, client sdk.GraphQLClie
 			var cursor string
 			if !export.Historical() {
 				state.Get(g.getRepoKey(repo), &cursor)
-				sb.WriteString(getAllRepoDataQuery(owner, name, label, cursor))
 			}
+			sb.WriteString(getAllRepoDataQuery(owner, name, label, cursor))
 		}
 		if err := client.Query("query { "+sb.String()+" rateLimit { limit cost remaining resetAt } }", nil, &result); err != nil {
 			if g.checkForAbuseDetection(logger, export, err) {
@@ -682,6 +685,7 @@ func (g *GithubIntegration) fetchRepos(logger sdk.Logger, client sdk.GraphQLClie
 		retryCount = 0
 		offset += len(repos)
 	}
+	sdk.LogInfo(logger, "returning from fetchRepos", "len", len(results))
 	return results, nil
 }
 
@@ -776,7 +780,7 @@ func (g *GithubIntegration) newHTTPClient(logger sdk.Logger, config sdk.Config) 
 // Export is called to tell the integration to run an export
 func (g *GithubIntegration) Export(export sdk.Export) error {
 	logger := sdk.LogWith(g.logger, "customer_id", export.CustomerID(), "job_id", export.JobID())
-	sdk.LogInfo(logger, "export started")
+	sdk.LogInfo(logger, "export started", "historical", export.Historical())
 	pipe := export.Pipe()
 	config := export.Config()
 
@@ -841,7 +845,11 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 			sdk.LogInfo(logger, "skipping repo because it didn't match inclusion rule", "name", name)
 			return false
 		}
-		return isArchived == false
+		if isArchived {
+			sdk.LogInfo(logger, "skipping repo because it is archived", "name", name)
+			return false
+		}
+		return true
 	}
 
 	sdk.LogDebug(logger, "exporting the following accounts", "orgs", orgs, "users", users)
@@ -861,6 +869,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 				repo.Login = login
 				repos[repo.Name] = repo
 				reponames = append(reponames, repo.Name)
+				sdk.LogInfo(logger, "user repo will be included", "name", repo.Name, "login", login)
 			}
 		}
 	}
@@ -877,6 +886,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 				repo.Login = login
 				repos[repo.Name] = repo
 				reponames = append(reponames, repo.Name)
+				sdk.LogInfo(logger, "org repo will be included", "name", repo.Name, "login", login)
 			}
 		}
 	}
@@ -901,7 +911,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 		if _, err := state.Get(previousReposStateKey, &previousRepos); err != nil {
 			sdk.LogError(logger, "error fetching previous repos state", "err", err)
 		} else {
-			hasPreviousRepos = true
+			hasPreviousRepos = len(previousRepos) > 0
 		}
 	}
 
@@ -910,6 +920,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 		reposFound := make(map[string]bool)
 		for _, node := range therepos {
 			reposFound[node.Name] = true
+			sdk.LogDebug(logger, "processing repo", "name", node.Name, "ref_id", node.ID)
 		}
 		for _, repo := range previousRepos {
 			// if not found, it may be that we're now excluding it OR
@@ -931,11 +942,11 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 
 	// process the work config
 	if err := g.processWorkConfig(config, pipe, state, customerID, instanceID, export.Historical()); err != nil {
-		return err
+		return fmt.Errorf("error processing work config: %w", err)
 	}
 
 	if err := g.processDefaultIssueType(logger, pipe, state, customerID, instanceID, export.Historical()); err != nil {
-		return err
+		return fmt.Errorf("error processing default issue type: %w", err)
 	}
 
 	for _, node := range therepos {
@@ -1001,7 +1012,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 				reviewCount++
 			}
 			if predge.Node.Reviews.PageInfo.HasNextPage {
-				jobs = append(jobs, g.queuePullRequestReviewsJob(logger, client, userManager, r.Login, r.RepoName, repo.GetID(), pullrequest.ID, predge.Node.Number, predge.Node.Comments.PageInfo.EndCursor))
+				jobs = append(jobs, g.queuePullRequestReviewsJob(logger, client, userManager, r.Login, r.RepoName, repo.GetID(), pullrequest.ID, predge.Node.Number, predge.Node.Reviews.PageInfo.EndCursor))
 			}
 			for _, commentedge := range predge.Node.Comments.Edges {
 				prcomment, err := commentedge.Node.ToModel(logger, userManager, customerID, repo.ID, pullrequest.ID)
@@ -1052,17 +1063,17 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 		if r.HasIssuesEnabled {
 			sdk.LogDebug(logger, "issues enabled for this repo", "name", node.Name)
 			if err := g.fetchAllRepoIssues(logger, client, userManager, export, r.Login, r.RepoName, r.ID, export.Historical()); err != nil {
-				return err
+				return fmt.Errorf("error fetching repo issues: %w", err)
 			}
 			if err := g.fetchAllRepoMilestones(logger, client, userManager, export, r.Login, r.RepoName, r.ID, export.Historical()); err != nil {
-				return err
+				return fmt.Errorf("error fetching repo milestones: %w", err)
 			}
 		}
 
 		if project != nil && r.HasProjectsEnabled {
 			sdk.LogDebug(logger, "projects enabled for this repo", "name", node.Name)
 			if err := g.fetchRepoProjects(logger, client, export, r.Login, r.RepoName, r.ID); err != nil {
-				return err
+				return fmt.Errorf("error fetching repo projects: %w", err)
 			}
 		}
 
@@ -1081,11 +1092,11 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 		return fmt.Errorf("error saving previous repos state: %w", err)
 	}
 
-	sdk.LogInfo(logger, "initial export completed", "duration", time.Since(started), "repoCount", repoCount, "prCount", prCount, "reviewCount", reviewCount, "commitCount", commitCount, "commentCount", commentCount)
+	sdk.LogInfo(logger, "initial export completed", "duration", time.Since(started), "repoCount", repoCount, "prCount", prCount, "reviewCount", reviewCount, "commitCount", commitCount, "commentCount", commentCount, "jobs", len(jobs))
 
 	_, skipHistorical := g.config.GetBool("skip-historical")
 
-	if !skipHistorical {
+	if !skipHistorical && len(jobs) > 0 {
 
 		// flush any pending data to get it to send immediately
 		pipe.Flush()
