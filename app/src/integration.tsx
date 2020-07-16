@@ -37,19 +37,6 @@ const viewerOrgsGQL = `{
 	}
 }`;
 
-// const getEntityName = (val: string) => {
-// 	let res = val;
-// 	if (res.charAt(0) === '@') {
-// 		res = res.substring(1);
-// 	}
-// 	if (/https?:/.test(res)) {
-// 		// looks like a url
-// 		const i = res.lastIndexOf('/');
-// 		res = res.substring(i + 1);
-// 	}
-// 	return res;
-// };
-
 const githubUserToAccount = (data: any, isPublic: boolean): Account => {
 	return {
 		id: data.login,
@@ -73,24 +60,6 @@ const githubOrgToAccount = (data: any, isPublic: boolean): Account => {
 		public: isPublic,
 	};
 };
-
-// const fetchUser = async (name: string, api_key: string, onAdd: (account: Account) => void) => {
-// 	const [data, status] = await Http.get('https://api.github.com/users/' + getEntityName(name), {Authorization: `Bearer ${api_key}`});
-// 	if (status === 404) {
-// 		alert(`User ${name} doesn't exist`);
-// 		return;
-// 	}
-// 	onAdd(githubUserToAccount(data, true));
-// };
-
-// const fetchOrg = async (name: string, api_key: string, onAdd: (account: Account) => void) => {
-// 	const [data, status] = await Http.get('https://api.github.com/orgs/' + getEntityName(name), {Authorization: `Bearer ${api_key}`});
-// 	if (status === 404) {
-// 		fetchUser(name, api_key, onAdd);
-// 		return;
-// 	}
-// 	onAdd(githubOrgToAccount(data, true));
-// };
 
 const fetchViewerOrgs = async(api_key: string) => {
 	const [data] = await Graphql.query('https://api.github.com/graphql', viewerOrgsGQL, undefined, {Authorization: `Bearer ${api_key}`});
@@ -161,66 +130,22 @@ const LocationSelector = ({ setType }: { setType: (val: IntegrationType) => void
 };
 
 const SelfManagedForm = () => {
-	// TODO
-	// const { setInstallEnabled, setConfig } = useIntegration();
-	// const [url, setURL] = useState(config.selfmanaged?.url);
-	// const [apikey, setAPIKey] = useState(config.selfmanaged?.apikey);
-	// const urlRef = useRef<any>();
-	// const apikeyRef = useRef<any>();
-	// const onUrlChange = useCallback(() => {
-	// 	const props = config.selfmanaged || {};
-	// 	config.selfmanaged = props;
-	// 	props.url = urlRef.current.value;
-	// 	setURL(urlRef.current.value);
-	// 	setInstallEnabled(props.url && props.apikey);
-	// 	setConfig(config);
-	// }, [config, setURL, setInstallEnabled, setConfig]);
-	// const onAPIKeyChange = useCallback(() => {
-	// 	const props = config.selfmanaged || {};
-	// 	config.selfmanaged = props;
-	// 	props.apikey = apikeyRef.current.value;
-	// 	setAPIKey(apikeyRef.current.value);
-	// 	setInstallEnabled(props.url && props.apikey);
-	// 	setConfig(config);
-	// }, [config, setAPIKey, setInstallEnabled, setConfig]);
-	// useEffect(() => {
-	// 	const props = config.selfmanaged || {};
-	// 	setInstallEnabled(props.url && props.apikey);
-	// }, [config, setInstallEnabled]);
-	// return (
-	// 	<div style={{fontSize: '1.6rem'}}>
-	// 		<p style={{marginBottom: '2rem'}}>Enter your credentials to your GitHub server</p>
-	// 		<div style={{display: 'flex', flexDirection:'row', flexWrap: 'wrap', alignItems: 'center', marginBottom: '2rem'}}>
-	// 			<label style={{flex:'1 0 2rem', maxWidth: '10rem'}}>URL</label>
-	// 			<input ref={urlRef} style={{flex:'1 0 2rem', maxWidth: '50rem'}} type="text" name="url" value={url} placeholder="Your GitHub URL" onChange={onUrlChange} />
-	// 		</div>
-	// 		<div style={{display: 'flex', flexDirection:'row'}}>
-	// 			<label style={{flex:'1 0 2rem', maxWidth: '10rem'}}>API Key</label>
-	// 			<input ref={apikeyRef} style={{flex:'1 0 2rem', maxWidth: '50rem'}} type="text" name="apikey" value={apikey} placeholder="Your GitHub API Key" onChange={onAPIKeyChange} />
-	// 		</div>
-	// 	</div>
-	// );
-
 	return <Form type={FormType.API} name="GitHub" />;
-
-	// FormType.BASIC = Username + Password
-	// FormType.API = API Token
 };
 
 const Integration = () => {
-	const { loading, currentURL, config, isFromRedirect, setConfig, authorization } = useIntegration();
+	const { loading, currentURL, config, isFromRedirect, isFromReAuth, setConfig, authorization } = useIntegration();
 	const [type, setType] = useState<IntegrationType | undefined>(config.integration_type);
 	const [, setRerender] = useState(0);
 	const currentConfig = useRef(config);
 
 	useEffect(() => {
-		if (!loading && authorization?.access_token) {
+		if (!loading && authorization?.oauth2_auth) {
 			config.integration_type = IntegrationType.CLOUD;
 			config.oauth2_auth = {
-				access_token: authorization.access_token,
-				refresh_token: authorization.refresh_token,
-				scopes: authorization.scopes,
-				created: authorization.created,
+				access_token: authorization.oauth2_auth.access_token,
+				refresh_token: authorization.oauth2_auth.refresh_token,
+				scopes: authorization.oauth2_auth.scopes,
 			};
 
 			setType(IntegrationType.CLOUD);
@@ -246,7 +171,6 @@ const Integration = () => {
 					config.oauth2_auth = {
 						access_token: profile.Integration.auth.accessToken,
 						scopes: profile.Integration.auth.scopes,
-						created: profile.Integration.auth.created,
 					};
 
 					setType(IntegrationType.CLOUD);
@@ -274,19 +198,23 @@ const Integration = () => {
 
 	let content;
 
-	if (!config.integration_type) {
-		content = <LocationSelector setType={setType} />;
-	} else if (config.integration_type === IntegrationType.CLOUD && !config.oauth2_auth) {
-		content = <OAuthConnect name="GitHub" />;
-	} else if (config.integration_type === IntegrationType.SELFMANAGED && (!config.basic_auth || !config.apikey_auth)) {
-		content = <SelfManagedForm />;
+	if (isFromReAuth) {
+		if (config.integration_type === IntegrationType.CLOUD) {
+			content = <OAuthConnect name="GitHub" reauth />
+		} else {
+			content = <SelfManagedForm />;
+		}
 	} else {
-		content = <AccountList />;
+		if (!config.integration_type) {
+			content = <LocationSelector setType={setType} />;
+		} else if (config.integration_type === IntegrationType.CLOUD && !config.oauth2_auth) {
+			content = <OAuthConnect name="GitHub" />;
+		} else if (config.integration_type === IntegrationType.SELFMANAGED && (!config.basic_auth || !config.apikey_auth)) {
+			content = <SelfManagedForm />;
+		} else {
+			content = <AccountList />;
+		}
 	}
-
-	// TODO Show this if we _require_ reauth;
-	//   if user chooses reauth, just show the normal OAuthConnect
-	// content = <OAuthConnect name="GitHub" reauth />;
 
 	return (
 		<div className={styles.Wrapper}>
