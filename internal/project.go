@@ -88,6 +88,7 @@ func (p repoProject) ToModel(logger sdk.Logger, customerID string, integrationIn
 	kanban.IntegrationInstanceID = sdk.StringPointer(integrationInstanceID)
 	kanban.RefType = refType
 	kanban.RefID = p.ID
+	kanban.Name = p.Name
 	kanban.Active = true
 	kanban.URL = p.URL
 	kanban.BoardID = board.ID
