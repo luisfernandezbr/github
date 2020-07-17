@@ -19,6 +19,7 @@ const (
 	defaultRetryPageSize             = 25
 	defaultPullRequestCommitPageSize = 100
 	previousReposStateKey            = "previous_repos"
+	previousProjectsStateKey         = "previous_projects"
 )
 
 type job func(export sdk.Export, pipe sdk.Pipe) error
@@ -772,6 +773,7 @@ func (g *GithubIntegration) newHTTPClient(logger sdk.Logger, config sdk.Config) 
 		})
 		sdk.LogInfo(logger, "using basic authorization", "username", config.BasicAuth.Username)
 	} else {
+		sdk.LogDebug(logger, "config JSON: "+sdk.Stringify(config))
 		return "", nil, fmt.Errorf("supported authorization not provided. support for: apikey, oauth2, basic")
 	}
 	return url, client, nil
@@ -906,12 +908,18 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 	var repoCount, prCount, reviewCount, commitCount, commentCount int
 	var hasPreviousRepos bool
 	previousRepos := make(map[string]*sdk.SourceCodeRepo)
+	previousProjects := make(map[string]*sdk.WorkProject)
 
 	if state.Exists(previousReposStateKey) {
 		if _, err := state.Get(previousReposStateKey, &previousRepos); err != nil {
 			sdk.LogError(logger, "error fetching previous repos state", "err", err)
 		} else {
 			hasPreviousRepos = len(previousRepos) > 0
+		}
+	}
+	if state.Exists(previousProjectsStateKey) {
+		if _, err := state.Get(previousReposStateKey, &previousProjects); err != nil {
+			sdk.LogError(logger, "error fetching previous projects state", "err", err)
 		}
 	}
 
@@ -936,6 +944,16 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 				// remove the webhook
 				r := repos[repo.Name]
 				g.uninstallRepoWebhook(g.manager.WebHookManager(), httpclient, customerID, instanceID, r.Login, repo.Name, r.ID)
+				// deactivate the project as well if one exists
+				project := previousProjects[repo.ID]
+				if project != nil {
+					project.Active = false
+					project.UpdatedAt = datetime.EpochNow()
+					sdk.LogInfo(logger, "deactivating a project no longer processed", "name", repo.Name)
+					if err := pipe.Write(project); err != nil {
+						return err
+					}
+				}
 			}
 		}
 	}
@@ -960,15 +978,18 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 			return err
 		}
 
+		repo, project, capability := node.ToModel(export.State(), export.Historical(), customerID, instanceID, r.Login, r.IsPrivate, r.Scope)
+
+		previousRepos[node.Name] = repo // remember it
+		if project != nil {
+			previousProjects[repo.ID] = project
+		}
+
 		if hookInstalled && !export.Historical() {
 			// if the hook is installed this isn't a historical, we can skip processing this repo
 			sdk.LogDebug(logger, "skipping repo since a webhook is already installed and not historical", "name", node.Name, "id", node.ID)
 			continue
 		}
-
-		repo, project, capability := node.ToModel(export.State(), export.Historical(), customerID, instanceID, r.Login, r.IsPrivate, r.Scope)
-
-		previousRepos[node.Name] = repo // remember it
 		if err := pipe.Write(repo); err != nil {
 			return err
 		}
@@ -1087,10 +1108,14 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 		}
 	}
 
-	// remember the repos we processed
+	// remember the repos and projects we processed
 	if err := state.Set(previousReposStateKey, previousRepos); err != nil {
 		return fmt.Errorf("error saving previous repos state: %w", err)
 	}
+	if err := state.Set(previousProjectsStateKey, previousProjects); err != nil {
+		return fmt.Errorf("error saving previous projects state: %w", err)
+	}
+	sdk.LogDebug(logger, "saved previous state", "repos", len(previousRepos), "projects", len(previousProjects))
 
 	sdk.LogInfo(logger, "initial export completed", "duration", time.Since(started), "repoCount", repoCount, "prCount", prCount, "reviewCount", reviewCount, "commitCount", commitCount, "commentCount", commentCount, "jobs", len(jobs))
 

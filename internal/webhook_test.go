@@ -92,6 +92,11 @@ func (w *testWebhook) Headers() map[string]string {
 	return w.headers
 }
 
+// URL the webhook callback url
+func (w *testWebhook) URL() string {
+	return ""
+}
+
 // Paused must be called when the integration is paused for any reason such as rate limiting
 func (w *testWebhook) Paused(resetAt time.Time) error {
 	return nil

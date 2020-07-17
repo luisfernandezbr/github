@@ -95,6 +95,7 @@ func (p repoProject) ToModel(logger sdk.Logger, customerID string, integrationIn
 	kanban.ID = sdk.NewAgileKanbanID(customerID, p.ID, refType)
 	kanban.Columns = make([]sdk.AgileKanbanColumns, 0)
 	kanban.IssueIds = make([]string, 0)
+	kanban.ProjectIds = []string{projectID}
 
 	for _, c := range p.Columns.Nodes {
 		var col sdk.AgileKanbanColumns
