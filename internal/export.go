@@ -11,7 +11,6 @@ import (
 
 	easyjson "github.com/mailru/easyjson"
 	"github.com/pinpt/agent.next/sdk"
-	"github.com/pinpt/go-common/v10/datetime"
 )
 
 const (
@@ -936,7 +935,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 			// in either case we need to mark the repo as inactive
 			if !reposFound[repo.Name] {
 				repo.Active = false
-				repo.UpdatedAt = datetime.EpochNow()
+				repo.UpdatedAt = sdk.EpochNow()
 				sdk.LogInfo(logger, "deactivating a repo no longer processed", "name", repo.Name)
 				if err := pipe.Write(repo); err != nil {
 					return err
@@ -948,7 +947,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 				project := previousProjects[repo.ID]
 				if project != nil {
 					project.Active = false
-					project.UpdatedAt = datetime.EpochNow()
+					project.UpdatedAt = sdk.EpochNow()
 					sdk.LogInfo(logger, "deactivating a project no longer processed", "name", repo.Name)
 					if err := pipe.Write(project); err != nil {
 						return err
