@@ -230,6 +230,7 @@ func (i issue) ToModel(logger sdk.Logger, userManager *UserManager, customerID s
 	} else {
 		issue.Status = "OPEN"
 	}
+	issue.StatusID = sdk.NewWorkIssueStatusID(customerID, refType, issue.Status)
 	setIssueType(&issue, i.Labels.Nodes)
 	issue.CreatorRefID = i.Author.RefID(customerID)
 	issue.ReporterRefID = i.Author.RefID(customerID)
