@@ -190,7 +190,7 @@ var pullrequestFields = `
 var pullrequestPagedQuery = fmt.Sprintf(`
 query GetPullRequests($name: String!, $owner: String!, $first: Int!, $after: String) {
 	repository(name: $name, owner: $owner) {
-		pullRequests(first: $first, after: $after, orderBy: {field: UPDATED_AT, direction: DESC}) {
+		pullRequests(first: $first, after: $after, orderBy: {field: UPDATED_AT, direction: DESC}, states:[OPEN, MERGED, CLOSED]) {
 			totalCount
 			pageInfo {
 				hasNextPage
@@ -562,7 +562,7 @@ func getAllRepoDataQuery(owner, name, label, cursor string) string {
 			  description
 			}
 		}
-		pullRequests(first: 10, orderBy: {field: UPDATED_AT, direction: DESC} %s) {
+		pullRequests(first: 10, orderBy: {field: UPDATED_AT, direction: DESC}, states:[OPEN, MERGED, CLOSED] %s) {
 			totalCount
 			pageInfo {
 				hasNextPage
@@ -739,7 +739,7 @@ query getIssues($name: String!, $owner: String!, $before: String, $after: String
 		resetAt
 	}
 	repository(name: $name, owner: $owner) {
-	  issues(first: 100, before: $before, after: $after, orderBy: {field: UPDATED_AT, direction: DESC}) {
+	  issues(first: 100, before: $before, after: $after, orderBy: {field: UPDATED_AT, direction: DESC}, states: [OPEN, CLOSED]) {
 		totalCount
 		pageInfo {
 			hasNextPage

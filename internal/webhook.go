@@ -10,10 +10,13 @@ import (
 )
 
 type webhookResponse struct {
-	ID     int64  `json:"id"`
+	ID     int    `json:"id"`
 	Name   string `json:"name"`
-	URL    string `json:"url"`
 	Active bool   `json:"active"`
+	Config struct {
+		URL string `json:"url"`
+	} `json:"config"`
+	URL string `json:"url"`
 }
 
 var webhookEvents = []string{
@@ -31,15 +34,35 @@ var webhookEvents = []string{
 	"milestone",
 }
 
+const hookVersion = "1" // change this to upgrade the hook in case the events change
+
 func (g *GithubIntegration) isOrgWebHookInstalled(manager sdk.WebHookManager, customerID string, integrationInstanceID string, login string) bool {
-	return manager.Exists(customerID, integrationInstanceID, refType, login, sdk.WebHookScopeOrg)
+	if manager.Exists(customerID, integrationInstanceID, refType, login, sdk.WebHookScopeOrg) {
+		theurl, _ := g.manager.WebHookManager().HookURL(customerID, integrationInstanceID, refType, login, sdk.WebHookScopeOrg)
+		// check and see if we need to upgrade our hook
+		if !strings.Contains(theurl, "version="+hookVersion) {
+			g.manager.WebHookManager().Delete(customerID, integrationInstanceID, refType, login, sdk.WebHookScopeOrg)
+			return false
+		}
+		return true
+	}
+	return false
 }
 
 func (g *GithubIntegration) isWebHookInstalledForRepo(manager sdk.WebHookManager, customerID, integrationInstanceID, orgLogin, repoRefID string) bool {
 	if g.isOrgWebHookInstalled(manager, customerID, integrationInstanceID, orgLogin) {
 		return true
 	}
-	return manager.Exists(customerID, integrationInstanceID, refType, repoRefID, sdk.WebHookScopeRepo)
+	if manager.Exists(customerID, integrationInstanceID, refType, repoRefID, sdk.WebHookScopeRepo) {
+		theurl, _ := g.manager.WebHookManager().HookURL(customerID, integrationInstanceID, refType, repoRefID, sdk.WebHookScopeRepo)
+		// check and see if we need to upgrade our hook
+		if !strings.Contains(theurl, "version="+hookVersion) {
+			g.manager.WebHookManager().Delete(customerID, integrationInstanceID, refType, repoRefID, sdk.WebHookScopeRepo)
+			return false
+		}
+		return true
+	}
+	return false
 }
 
 func (g *GithubIntegration) installRepoWebhookIfRequired(manager sdk.WebHookManager, logger sdk.Logger, client sdk.HTTPClient, customerID string, integrationInstanceID string, login string, repoName string, repoRefID string) (bool, error) {
@@ -47,19 +70,21 @@ func (g *GithubIntegration) installRepoWebhookIfRequired(manager sdk.WebHookMana
 		sdk.LogDebug(logger, "webhook is already enabled for this repo", "repo_id", repoRefID, "name", repoName, "org", login)
 		return true, nil
 	}
-	url, err := g.manager.WebHookManager().Create(customerID, integrationInstanceID, refType, repoRefID, sdk.WebHookScopeRepo)
+	sdk.LogDebug(logger, "creating a repo webhook", "name", repoName, "repo_id", repoRefID, "org", login)
+	url, err := g.manager.WebHookManager().Create(customerID, integrationInstanceID, refType, repoRefID, sdk.WebHookScopeRepo, "scope=repo", "ref_id="+repoRefID, "version="+hookVersion)
 	if err != nil {
 		if err.Error() == "webhook: disabled" {
 			sdk.LogInfo(logger, "webhooks are disabled in dev mode")
 			return false, nil // this is ok, just in dev mode disabled
 		}
+		sdk.LogDebug(logger, "error creating a repo webhook", "name", repoName, "repo_id", repoRefID, "org", login, "err", err)
 		return false, fmt.Errorf("error creating webhook url for %s: %w", login, err)
 	}
 	// need to try and install
 	params := map[string]interface{}{
 		"name": "web",
 		"config": map[string]interface{}{
-			"url":          url + "&scope=repo&ref_id=" + repoRefID,
+			"url":          url,
 			"content_type": "json",
 			"insecure_ssl": "0",
 			"secret":       integrationInstanceID,
@@ -68,17 +93,14 @@ func (g *GithubIntegration) installRepoWebhookIfRequired(manager sdk.WebHookMana
 		"active": true,
 	}
 	kv := make(map[string]interface{})
+	sdk.LogDebug(logger, "creating a repo webhook on github", "name", repoName, "repo_id", repoRefID, "org", login, "params", sdk.Stringify(params))
 	resp, err := client.Post(strings.NewReader(sdk.Stringify(params)), &kv, sdk.WithEndpoint("/repos/"+repoName+"/hooks"))
 	if err != nil {
-		if ok, status, _ := sdk.IsHTTPError(err); ok {
-			if status == http.StatusNotFound {
-				manager.Errored(customerID, integrationInstanceID, refType, repoRefID, sdk.WebHookScopeRepo, fmt.Errorf("unauthorized trying to create webhook for this repo"))
-				return false, nil
-			}
-		}
+		sdk.LogDebug(logger, "error creating a repo webhook on github", "err", err, "repo_id", repoName, "repo_id", repoRefID, "org", login)
 		manager.Errored(customerID, integrationInstanceID, refType, repoRefID, sdk.WebHookScopeRepo, err)
 		return false, nil
 	}
+	sdk.LogDebug(logger, "webhook result", "data", sdk.Stringify(kv), "status", resp.StatusCode, "repo", repoName)
 	if resp.StatusCode != http.StatusCreated {
 		manager.Errored(customerID, integrationInstanceID, refType, repoRefID, sdk.WebHookScopeRepo, fmt.Errorf("unexpected status code (%d) trying to create webhook", resp.StatusCode))
 		return false, nil
@@ -91,11 +113,16 @@ func (g *GithubIntegration) uninstallRepoWebhook(manager sdk.WebHookManager, cli
 	var found bool
 	client.Get(&webhooks, sdk.WithEndpoint(fmt.Sprintf("/repos/"+repoName+"/hooks")))
 	for _, hook := range webhooks {
-		if strings.Contains(hook.URL, integrationInstanceID) {
+		sdk.LogDebug(g.logger, "inspecting repo webhook", "name", repoName, "url", hook.URL, "hookid", hook.ID, "hookurl", hook.Config.URL, "id", integrationInstanceID)
+		if strings.Contains(hook.Config.URL, integrationInstanceID) {
 			var res interface{}
 			client.Delete(&res, sdk.WithEndpoint(fmt.Sprintf("/repos/"+repoName+"/hooks/%d", hook.ID)))
 			found = true
+			sdk.LogDebug(g.logger, "deleted repo webhook", "res", sdk.Stringify(res), "name", repoName, "hookid", hook.ID)
 		}
+	}
+	if !found {
+		sdk.LogDebug(g.logger, "no repo webhook found for repo: "+repoName)
 	}
 	manager.Delete(customerID, integrationInstanceID, refType, repoRefID, sdk.WebHookScopeRepo)
 	if !found && orgLogin != "" {
@@ -129,13 +156,13 @@ func (g *GithubIntegration) registerOrgWebhook(manager sdk.WebHookManager, clien
 	}
 	var found bool
 	for _, hook := range webhooks {
-		if strings.Contains(hook.URL, "event-api") && strings.Contains(hook.URL, "pinpoint.com") && strings.Contains(hook.URL, integrationInstanceID) {
+		if strings.Contains(hook.URL, "event-api") && strings.Contains(hook.URL, "pinpoint.com") && strings.Contains(hook.Config.URL, integrationInstanceID) {
 			found = true
 			break
 		}
 	}
 	if !found {
-		url, err := g.manager.WebHookManager().Create(customerID, integrationInstanceID, refType, login, sdk.WebHookScopeOrg)
+		url, err := g.manager.WebHookManager().Create(customerID, integrationInstanceID, refType, login, sdk.WebHookScopeOrg, "scope=org", "version="+hookVersion)
 		if err != nil {
 			manager.Errored(customerID, integrationInstanceID, refType, login, sdk.WebHookScopeOrg, err)
 			return nil
@@ -143,7 +170,7 @@ func (g *GithubIntegration) registerOrgWebhook(manager sdk.WebHookManager, clien
 		params := map[string]interface{}{
 			"name": "web",
 			"config": map[string]interface{}{
-				"url":          url + "&scope=org",
+				"url":          url,
 				"content_type": "json",
 				"insecure_ssl": "0",
 				"secret":       integrationInstanceID,

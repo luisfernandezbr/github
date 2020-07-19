@@ -9,8 +9,8 @@ github.com/DataDog/sketches-go v0.0.0-20190923095040-43f19ad77ff7 h1:qELHH0AWCvf
 github.com/DataDog/sketches-go v0.0.0-20190923095040-43f19ad77ff7/go.mod h1:Q5DbzQ+3AkgGwymQO7aZFNP7ns2lZKGtvRBzRXfdi60=
 github.com/JohannesKaufmann/html-to-markdown v0.0.0-20200615184431-e6649df6ed2e h1:VgKySjlZPrC/mXZ0uqmdzRGsxPGGW8jh0GiuQXlvUC4=
 github.com/JohannesKaufmann/html-to-markdown v0.0.0-20200615184431-e6649df6ed2e/go.mod h1:Qnhxlb4mi8T2624UtHX8EgDyYZXWbjQfLGuciFHZ+Go=
-github.com/JohannesKaufmann/html-to-markdown v0.0.0-20200716201554-b46a9fbd5b11 h1:ykUJ7jmAzrNcB0X9Y448f3RvMFopWQIEYd5xUh5hTLo=
-github.com/JohannesKaufmann/html-to-markdown v0.0.0-20200716201554-b46a9fbd5b11/go.mod h1:/2Kmd4uaaaco63qCFSBjS3K9gYfL+dlamxoNtsp0nEU=
+github.com/JohannesKaufmann/html-to-markdown v0.0.0-20200718125617-d92c47ac7318 h1:sfdVwdJlNvjFyfOFrKl3MzIW6mxyow/l3htfVF6GPAg=
+github.com/JohannesKaufmann/html-to-markdown v0.0.0-20200718125617-d92c47ac7318/go.mod h1:/2Kmd4uaaaco63qCFSBjS3K9gYfL+dlamxoNtsp0nEU=
 github.com/Knetic/govaluate v3.0.1-0.20171022003610-9aa49832a739+incompatible/go.mod h1:r7JcOSlj0wfOMncg0iLm8Leh48TZaKVeNIfJntJ2wa0=
 github.com/Netflix/go-expect v0.0.0-20180615182759-c93bf25de8e8/go.mod h1:oX5x61PbNXchhh0oikYAH+4Pcfw5LKv21+Jnpr6r6Pc=
 github.com/OneOfOne/xxhash v1.2.2 h1:KMrpdQIwFcEqXDklaen+P1axHaj9BSKzvpUUfnHldSE=
@@ -347,8 +347,8 @@ github.com/pinpt/httpclient v0.0.0-20190815022759-09e0028c9067 h1:GG0k6rjX7ywCwY
 github.com/pinpt/httpclient v0.0.0-20190815022759-09e0028c9067/go.mod h1:SzzGa0kOT+frqT6ABgV69U9+jlMU98XkmKup+HEZRVI=
 github.com/pinpt/httpclient v0.0.0-20200627153820-d374c2f15648 h1:hkfjX+KJmcSLpFjWqiZtnPIRsJBcOrMdgJD1d5fisB8=
 github.com/pinpt/httpclient v0.0.0-20200627153820-d374c2f15648/go.mod h1:SzzGa0kOT+frqT6ABgV69U9+jlMU98XkmKup+HEZRVI=
-github.com/pinpt/integration-sdk v0.0.1091 h1:xkdBLm0WAKPY5Ak81Hi+oIbkiN4foWmaAm3PBwfMgEE=
-github.com/pinpt/integration-sdk v0.0.1091/go.mod h1:bM5Eff/xhdpT39fVKuylBJt69fPpGVk85Tl+cOs2yqg=
+github.com/pinpt/integration-sdk v0.0.1092 h1:nWCa51gCU08Ruxc5wADgG1TyGLrR7hagOSgocmV5D1A=
+github.com/pinpt/integration-sdk v0.0.1092/go.mod h1:bM5Eff/xhdpT39fVKuylBJt69fPpGVk85Tl+cOs2yqg=
 github.com/pkg/browser v0.0.0-20180916011732-0a3d74bf9ce4 h1:49lOXmGaUpV9Fz3gd7TFZY106KVlPVa5jcYD1gaQf98=
 github.com/pkg/browser v0.0.0-20180916011732-0a3d74bf9ce4/go.mod h1:4OwLy04Bl9Ef3GJJCoec+30X3LQs/0/m4HFRt/2LUSA=
 github.com/pkg/errors v0.8.0/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=

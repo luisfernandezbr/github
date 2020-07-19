@@ -746,7 +746,7 @@ func (g *GithubIntegration) newHTTPClient(logger sdk.Logger, config sdk.Config) 
 		client = g.manager.HTTPManager().New(url, map[string]string{
 			"Authorization": "bearer " + apikey,
 		})
-		sdk.LogInfo(logger, "using apikey authorization")
+		sdk.LogInfo(logger, "using apikey authorization", "url", url)
 	} else if config.OAuth2Auth != nil {
 		authToken := config.OAuth2Auth.AccessToken
 		if config.OAuth2Auth.RefreshToken != nil {
@@ -762,7 +762,7 @@ func (g *GithubIntegration) newHTTPClient(logger sdk.Logger, config sdk.Config) 
 		client = g.manager.HTTPManager().New(url, map[string]string{
 			"Authorization": "bearer " + authToken,
 		})
-		sdk.LogInfo(logger, "using oauth2 authorization")
+		sdk.LogInfo(logger, "using oauth2 authorization", "url", url)
 	} else if config.BasicAuth != nil {
 		if config.BasicAuth.URL != "" {
 			url = config.BasicAuth.URL
@@ -770,7 +770,7 @@ func (g *GithubIntegration) newHTTPClient(logger sdk.Logger, config sdk.Config) 
 		client = g.manager.HTTPManager().New(url, map[string]string{
 			"Authorization": "Basic " + base64.StdEncoding.EncodeToString([]byte(config.BasicAuth.Username+":"+config.BasicAuth.Password)),
 		})
-		sdk.LogInfo(logger, "using basic authorization", "username", config.BasicAuth.Username)
+		sdk.LogInfo(logger, "using basic authorization", "username", config.BasicAuth.Username, "url", url)
 	} else {
 		sdk.LogDebug(logger, "config JSON: "+sdk.Stringify(config))
 		return "", nil, fmt.Errorf("supported authorization not provided. support for: apikey, oauth2, basic")
@@ -972,7 +972,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 		repoCount++
 		r := repos[node.Name]
 
-		hookInstalled, err := g.installRepoWebhookIfRequired(g.manager.WebHookManager(), logger, httpclient, customerID, instanceID, r.Login, r.RepoName, r.ID)
+		hookInstalled, err := g.installRepoWebhookIfRequired(g.manager.WebHookManager(), logger, httpclient, customerID, instanceID, r.Login, r.Name, r.ID)
 		if err != nil {
 			return err
 		}

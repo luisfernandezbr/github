@@ -38,13 +38,15 @@ func easyjson2a877177DecodeGithubComPinptAgentNextGithubInternal(in *jlexer.Lexe
 		}
 		switch key {
 		case "id":
-			out.ID = int64(in.Int64())
+			out.ID = int(in.Int())
 		case "name":
 			out.Name = string(in.String())
-		case "url":
-			out.URL = string(in.String())
 		case "active":
 			out.Active = bool(in.Bool())
+		case "config":
+			easyjson2a877177Decode(in, &out.Config)
+		case "url":
+			out.URL = string(in.String())
 		default:
 			in.SkipRecursive()
 		}
@@ -62,7 +64,7 @@ func easyjson2a877177EncodeGithubComPinptAgentNextGithubInternal(out *jwriter.Wr
 	{
 		const prefix string = ",\"id\":"
 		out.RawString(prefix[1:])
-		out.Int64(int64(in.ID))
+		out.Int(int(in.ID))
 	}
 	{
 		const prefix string = ",\"name\":"
@@ -70,14 +72,19 @@ func easyjson2a877177EncodeGithubComPinptAgentNextGithubInternal(out *jwriter.Wr
 		out.String(string(in.Name))
 	}
 	{
-		const prefix string = ",\"url\":"
-		out.RawString(prefix)
-		out.String(string(in.URL))
-	}
-	{
 		const prefix string = ",\"active\":"
 		out.RawString(prefix)
 		out.Bool(bool(in.Active))
+	}
+	{
+		const prefix string = ",\"config\":"
+		out.RawString(prefix)
+		easyjson2a877177Encode(out, in.Config)
+	}
+	{
+		const prefix string = ",\"url\":"
+		out.RawString(prefix)
+		out.String(string(in.URL))
 	}
 	out.RawByte('}')
 }
@@ -105,6 +112,52 @@ func (v *webhookResponse) UnmarshalJSON(data []byte) error {
 func (v *webhookResponse) UnmarshalEasyJSON(l *jlexer.Lexer) {
 	easyjson2a877177DecodeGithubComPinptAgentNextGithubInternal(l, v)
 }
+func easyjson2a877177Decode(in *jlexer.Lexer, out *struct {
+	URL string `json:"url"`
+}) {
+	isTopLevel := in.IsStart()
+	if in.IsNull() {
+		if isTopLevel {
+			in.Consumed()
+		}
+		in.Skip()
+		return
+	}
+	in.Delim('{')
+	for !in.IsDelim('}') {
+		key := in.UnsafeString()
+		in.WantColon()
+		if in.IsNull() {
+			in.Skip()
+			in.WantComma()
+			continue
+		}
+		switch key {
+		case "url":
+			out.URL = string(in.String())
+		default:
+			in.SkipRecursive()
+		}
+		in.WantComma()
+	}
+	in.Delim('}')
+	if isTopLevel {
+		in.Consumed()
+	}
+}
+func easyjson2a877177Encode(out *jwriter.Writer, in struct {
+	URL string `json:"url"`
+}) {
+	out.RawByte('{')
+	first := true
+	_ = first
+	{
+		const prefix string = ",\"url\":"
+		out.RawString(prefix[1:])
+		out.String(string(in.URL))
+	}
+	out.RawByte('}')
+}
 func easyjson2a877177DecodeGithubComPinptAgentNextGithubInternal1(in *jlexer.Lexer, out *viewerResult) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
@@ -125,7 +178,7 @@ func easyjson2a877177DecodeGithubComPinptAgentNextGithubInternal1(in *jlexer.Lex
 		}
 		switch key {
 		case "viewer":
-			easyjson2a877177Decode(in, &out.Viewer)
+			easyjson2a877177Decode1(in, &out.Viewer)
 		default:
 			in.SkipRecursive()
 		}
@@ -143,7 +196,7 @@ func easyjson2a877177EncodeGithubComPinptAgentNextGithubInternal1(out *jwriter.W
 	{
 		const prefix string = ",\"viewer\":"
 		out.RawString(prefix[1:])
-		easyjson2a877177Encode(out, in.Viewer)
+		easyjson2a877177Encode1(out, in.Viewer)
 	}
 	out.RawByte('}')
 }
@@ -171,7 +224,7 @@ func (v *viewerResult) UnmarshalJSON(data []byte) error {
 func (v *viewerResult) UnmarshalEasyJSON(l *jlexer.Lexer) {
 	easyjson2a877177DecodeGithubComPinptAgentNextGithubInternal1(l, v)
 }
-func easyjson2a877177Decode(in *jlexer.Lexer, out *struct {
+func easyjson2a877177Decode1(in *jlexer.Lexer, out *struct {
 	Login string `json:"login"`
 }) {
 	isTopLevel := in.IsStart()
@@ -204,7 +257,7 @@ func easyjson2a877177Decode(in *jlexer.Lexer, out *struct {
 		in.Consumed()
 	}
 }
-func easyjson2a877177Encode(out *jwriter.Writer, in struct {
+func easyjson2a877177Encode1(out *jwriter.Writer, in struct {
 	Login string `json:"login"`
 }) {
 	out.RawByte('{')
@@ -476,7 +529,7 @@ func easyjson2a877177DecodeGithubComPinptAgentNextGithubInternal5(in *jlexer.Lex
 		case "rateLimit":
 			(out.RateLimit).UnmarshalEasyJSON(in)
 		case "repository":
-			easyjson2a877177Decode1(in, &out.Repository)
+			easyjson2a877177Decode2(in, &out.Repository)
 		default:
 			in.SkipRecursive()
 		}
@@ -499,7 +552,7 @@ func easyjson2a877177EncodeGithubComPinptAgentNextGithubInternal5(out *jwriter.W
 	{
 		const prefix string = ",\"repository\":"
 		out.RawString(prefix)
-		easyjson2a877177Encode1(out, in.Repository)
+		easyjson2a877177Encode2(out, in.Repository)
 	}
 	out.RawByte('}')
 }
@@ -527,7 +580,7 @@ func (v *repositoryMilestonesResult) UnmarshalJSON(data []byte) error {
 func (v *repositoryMilestonesResult) UnmarshalEasyJSON(l *jlexer.Lexer) {
 	easyjson2a877177DecodeGithubComPinptAgentNextGithubInternal5(l, v)
 }
-func easyjson2a877177Decode1(in *jlexer.Lexer, out *struct {
+func easyjson2a877177Decode2(in *jlexer.Lexer, out *struct {
 	TotalCount int            `json:"totalCount"`
 	Milestones milestoneNodes `json:"milestones"`
 }) {
@@ -563,7 +616,7 @@ func easyjson2a877177Decode1(in *jlexer.Lexer, out *struct {
 		in.Consumed()
 	}
 }
-func easyjson2a877177Encode1(out *jwriter.Writer, in struct {
+func easyjson2a877177Encode2(out *jwriter.Writer, in struct {
 	TotalCount int            `json:"totalCount"`
 	Milestones milestoneNodes `json:"milestones"`
 }) {
@@ -630,7 +683,7 @@ func easyjson2a877177DecodeGithubComPinptAgentNextGithubInternal6(in *jlexer.Lex
 		case "pullRequests":
 			(out.Pullrequests).UnmarshalEasyJSON(in)
 		case "owner":
-			easyjson2a877177Decode(in, &out.Owner)
+			easyjson2a877177Decode1(in, &out.Owner)
 		default:
 			in.SkipRecursive()
 		}
@@ -713,7 +766,7 @@ func easyjson2a877177EncodeGithubComPinptAgentNextGithubInternal6(out *jwriter.W
 	{
 		const prefix string = ",\"owner\":"
 		out.RawString(prefix)
-		easyjson2a877177Encode(out, in.Owner)
+		easyjson2a877177Encode1(out, in.Owner)
 	}
 	out.RawByte('}')
 }
@@ -761,7 +814,7 @@ func easyjson2a877177DecodeGithubComPinptAgentNextGithubInternal7(in *jlexer.Lex
 		}
 		switch key {
 		case "data":
-			easyjson2a877177Decode2(in, &out.Data)
+			easyjson2a877177Decode3(in, &out.Data)
 		case "rateLimit":
 			(out.RateLimit).UnmarshalEasyJSON(in)
 		default:
@@ -781,7 +834,7 @@ func easyjson2a877177EncodeGithubComPinptAgentNextGithubInternal7(out *jwriter.W
 	{
 		const prefix string = ",\"data\":"
 		out.RawString(prefix[1:])
-		easyjson2a877177Encode2(out, in.Data)
+		easyjson2a877177Encode3(out, in.Data)
 	}
 	{
 		const prefix string = ",\"rateLimit\":"
@@ -814,7 +867,7 @@ func (v *repoWithNameResult) UnmarshalJSON(data []byte) error {
 func (v *repoWithNameResult) UnmarshalEasyJSON(l *jlexer.Lexer) {
 	easyjson2a877177DecodeGithubComPinptAgentNextGithubInternal7(l, v)
 }
-func easyjson2a877177Decode2(in *jlexer.Lexer, out *struct {
+func easyjson2a877177Decode3(in *jlexer.Lexer, out *struct {
 	Repositories struct {
 		TotalCount int        `json:"totalCount"`
 		PageInfo   pageInfo   `json:"pageInfo"`
@@ -840,7 +893,7 @@ func easyjson2a877177Decode2(in *jlexer.Lexer, out *struct {
 		}
 		switch key {
 		case "repositories":
-			easyjson2a877177Decode3(in, &out.Repositories)
+			easyjson2a877177Decode4(in, &out.Repositories)
 		default:
 			in.SkipRecursive()
 		}
@@ -851,7 +904,7 @@ func easyjson2a877177Decode2(in *jlexer.Lexer, out *struct {
 		in.Consumed()
 	}
 }
-func easyjson2a877177Encode2(out *jwriter.Writer, in struct {
+func easyjson2a877177Encode3(out *jwriter.Writer, in struct {
 	Repositories struct {
 		TotalCount int        `json:"totalCount"`
 		PageInfo   pageInfo   `json:"pageInfo"`
@@ -864,11 +917,11 @@ func easyjson2a877177Encode2(out *jwriter.Writer, in struct {
 	{
 		const prefix string = ",\"repositories\":"
 		out.RawString(prefix[1:])
-		easyjson2a877177Encode3(out, in.Repositories)
+		easyjson2a877177Encode4(out, in.Repositories)
 	}
 	out.RawByte('}')
 }
-func easyjson2a877177Decode3(in *jlexer.Lexer, out *struct {
+func easyjson2a877177Decode4(in *jlexer.Lexer, out *struct {
 	TotalCount int        `json:"totalCount"`
 	PageInfo   pageInfo   `json:"pageInfo"`
 	Nodes      []repoName `json:"nodes"`
@@ -928,7 +981,7 @@ func easyjson2a877177Decode3(in *jlexer.Lexer, out *struct {
 		in.Consumed()
 	}
 }
-func easyjson2a877177Encode3(out *jwriter.Writer, in struct {
+func easyjson2a877177Encode4(out *jwriter.Writer, in struct {
 	TotalCount int        `json:"totalCount"`
 	PageInfo   pageInfo   `json:"pageInfo"`
 	Nodes      []repoName `json:"nodes"`
@@ -984,7 +1037,7 @@ func easyjson2a877177DecodeGithubComPinptAgentNextGithubInternal8(in *jlexer.Lex
 		}
 		switch key {
 		case "repository":
-			easyjson2a877177Decode4(in, &out.Repository)
+			easyjson2a877177Decode5(in, &out.Repository)
 		default:
 			in.SkipRecursive()
 		}
@@ -1002,7 +1055,7 @@ func easyjson2a877177EncodeGithubComPinptAgentNextGithubInternal8(out *jwriter.W
 	{
 		const prefix string = ",\"repository\":"
 		out.RawString(prefix[1:])
-		easyjson2a877177Encode4(out, in.Repository)
+		easyjson2a877177Encode5(out, in.Repository)
 	}
 	out.RawByte('}')
 }
@@ -1030,7 +1083,7 @@ func (v *repoProjectsResult) UnmarshalJSON(data []byte) error {
 func (v *repoProjectsResult) UnmarshalEasyJSON(l *jlexer.Lexer) {
 	easyjson2a877177DecodeGithubComPinptAgentNextGithubInternal8(l, v)
 }
-func easyjson2a877177Decode4(in *jlexer.Lexer, out *struct {
+func easyjson2a877177Decode5(in *jlexer.Lexer, out *struct {
 	Projects repoProjectNode `json:"projects"`
 }) {
 	isTopLevel := in.IsStart()
@@ -1063,7 +1116,7 @@ func easyjson2a877177Decode4(in *jlexer.Lexer, out *struct {
 		in.Consumed()
 	}
 }
-func easyjson2a877177Encode4(out *jwriter.Writer, in struct {
+func easyjson2a877177Encode5(out *jwriter.Writer, in struct {
 	Projects repoProjectNode `json:"projects"`
 }) {
 	out.RawByte('{')
@@ -1096,7 +1149,7 @@ func easyjson2a877177DecodeGithubComPinptAgentNextGithubInternal9(in *jlexer.Lex
 		}
 		switch key {
 		case "repository":
-			easyjson2a877177Decode5(in, &out.Repository)
+			easyjson2a877177Decode6(in, &out.Repository)
 		default:
 			in.SkipRecursive()
 		}
@@ -1114,7 +1167,7 @@ func easyjson2a877177EncodeGithubComPinptAgentNextGithubInternal9(out *jwriter.W
 	{
 		const prefix string = ",\"repository\":"
 		out.RawString(prefix[1:])
-		easyjson2a877177Encode5(out, in.Repository)
+		easyjson2a877177Encode6(out, in.Repository)
 	}
 	out.RawByte('}')
 }
@@ -1142,7 +1195,7 @@ func (v *repoProjectResult) UnmarshalJSON(data []byte) error {
 func (v *repoProjectResult) UnmarshalEasyJSON(l *jlexer.Lexer) {
 	easyjson2a877177DecodeGithubComPinptAgentNextGithubInternal9(l, v)
 }
-func easyjson2a877177Decode5(in *jlexer.Lexer, out *struct {
+func easyjson2a877177Decode6(in *jlexer.Lexer, out *struct {
 	Project repoProject `json:"project"`
 }) {
 	isTopLevel := in.IsStart()
@@ -1175,7 +1228,7 @@ func easyjson2a877177Decode5(in *jlexer.Lexer, out *struct {
 		in.Consumed()
 	}
 }
-func easyjson2a877177Encode5(out *jwriter.Writer, in struct {
+func easyjson2a877177Encode6(out *jwriter.Writer, in struct {
 	Project repoProject `json:"project"`
 }) {
 	out.RawByte('{')
