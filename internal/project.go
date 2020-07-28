@@ -169,7 +169,7 @@ func (r repository) ToProjectCapabilityModel(state sdk.State, repo *sdk.SourceCo
 	capability.RefID = repo.RefID
 	capability.RefType = repo.RefType
 	capability.IntegrationInstanceID = repo.IntegrationInstanceID
-	capability.ProjectID = repo.ID
+	capability.ProjectID = sdk.NewWorkProjectID(repo.CustomerID, repo.RefID, refType)
 	capability.UpdatedAt = repo.UpdatedAt
 	capability.Attachments = false
 	capability.ChangeLogs = false

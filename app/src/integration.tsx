@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Icon, Loader, Error } from '@pinpt/uic.next';
+import { Icon, Loader, Error as ErrorMessage } from '@pinpt/uic.next';
 import {
 	useIntegration,
 	Account,
@@ -9,6 +9,7 @@ import {
 	Graphql,
 	Form,
 	FormType,
+	IAppBasicAuth,
 } from '@pinpt/agent.websdk';
 import styles from './styles.module.less';
 
@@ -61,8 +62,14 @@ const githubOrgToAccount = (data: any, isPublic: boolean): Account => {
 	};
 };
 
-const fetchViewerOrgs = async(api_key: string) => {
+const fetchViewerOrgsOAuth = async(api_key: string) => {
 	const [data] = await Graphql.query('https://api.github.com/graphql', viewerOrgsGQL, undefined, {Authorization: `Bearer ${api_key}`});
+	return data;
+};
+
+const fetchViewerOrgsBasic = async(auth: IAppBasicAuth) => {
+	const enc = btoa(auth.username + ":" + auth.password);
+	const [data] = await Graphql.query(auth.url!, viewerOrgsGQL, undefined, {Authorization: `Basic ${enc}`});
 	return data;
 };
 
@@ -71,38 +78,40 @@ const AccountList = () => {
 	const [accounts, setAccounts] = useState<Account[]>([]);
 
 	useEffect(() => {
-		if (config.integration_type === IntegrationType.CLOUD) {
-			const fetch = async () => {
-				const data = await fetchViewerOrgs(config.oauth2_auth?.access_token!);
-				const orgs = config.accounts || {};
-				config.accounts = orgs;
-				const newaccounts = data.viewer.organizations.nodes.map((org: any) => githubOrgToAccount(org, false));
-				newaccounts.unshift(githubUserToAccount(data.viewer, false));
+		let data: any;
+		const fetch = async () => {
+			if (config.integration_type === IntegrationType.CLOUD) {
+				data = await fetchViewerOrgsOAuth(config.oauth2_auth?.access_token!);
+			} else {
+				data = await fetchViewerOrgsBasic(config.basic_auth!);
+			}
+			const orgs = config.accounts || {};
+			config.accounts = orgs;
+			const newaccounts = data.viewer.organizations.nodes.map((org: any) => githubOrgToAccount(org, false));
+			newaccounts.unshift(githubUserToAccount(data.viewer, false));
 
-				if (!installed) {
-					newaccounts.forEach((account: Account) => (orgs[account.id] = account));
+			if (!installed) {
+				newaccounts.forEach((account: Account) => (orgs[account.id] = account));
+			}
+
+			Object.keys(orgs).forEach((id: string) => {
+				const found = newaccounts.find((acct: Account) => acct.id === id);
+
+				if (!found) {
+					const entry = orgs[id];
+					newaccounts.push(entry);
 				}
+			});
 
-				Object.keys(orgs).forEach((id: string) => {
-					const found = newaccounts.find((acct: Account) => acct.id === id);
-
-					if (!found) {
-						const entry = orgs[id];
-						newaccounts.push(entry);
-					}
-				});
-
-				setAccounts(newaccounts);
-				setInstallEnabled(installed ? true : Object.keys(config.accounts).length > 0);
-				setConfig(config);
-			};
-
-			fetch();
-		}
+			setAccounts(newaccounts);
+			setInstallEnabled(installed ? true : Object.keys(config.accounts).length > 0);
+			setConfig(config);
+		};
+		fetch();
 	}, [installed, setInstallEnabled, config, setConfig]);
 
 	return (processingDetail?.throttled && processingDetail?.throttledUntilDate) ? (
-		<Error heading="Your authorization token has been throttled by GitHub." message={`Please try again in ${Math.ceil((processingDetail.throttledUntilDate - Date.now()) / 60000)} minutes.`} />
+		<ErrorMessage heading="Your authorization token has been throttled by GitHub." message={`Please try again in ${Math.ceil((processingDetail.throttledUntilDate - Date.now()) / 60000)} minutes.`} />
 	) : (
 		<AccountsTable
 			description="For the selected accounts, all repositories, issues, pull requests and other data will automatically be made available in Pinpoint once installed."
@@ -129,8 +138,31 @@ const LocationSelector = ({ setType }: { setType: (val: IntegrationType) => void
 	);
 };
 
-const SelfManagedForm = () => {
-	return <Form type={FormType.API} name="GitHub" />;
+const SelfManagedForm = ({ callback }: any) => {
+	const form = {
+		basic: {
+			password: {
+				display: 'Personal Access Token',
+				help: 'Please enter your Personal Access Token for this user',
+			},
+		},
+	};
+	return (
+		<Form type={FormType.BASIC} form={form} name="GitHub" callback={async (auth: IAppBasicAuth) => {
+			let url = auth.url!;
+			const u = new URL(url!);
+			if (url?.indexOf('/graphql') < 0) {
+				u.pathname = '/graphql';
+				auth.url = u.toString();
+			}
+			const enc = btoa(auth.username + ":" + auth.password);
+			const [data, status] = await Graphql.query(auth.url!, `query { viewer { id } }`, undefined, {Authorization: `Basic ${enc}`});
+			if (status !== 200) {
+				throw new Error(data.message ?? 'Invalid Credentials');
+			}
+			callback();
+		}} />
+	);
 };
 
 const Integration = () => {
@@ -153,7 +185,7 @@ const Integration = () => {
 
 			currentConfig.current = config;
 		}
-	}, [loading, authorization, config, setConfig]);
+	}, [loading, authorization]);
 
 	useEffect(() => {
 		if (!loading && isFromRedirect && currentURL) {
@@ -190,7 +222,7 @@ const Integration = () => {
 			setConfig(config);
 			setRerender(Date.now());
 		}
-	}, [type, config, setConfig]);
+	}, [type]);
 
 	if (loading) {
 		return <Loader screen />;
@@ -209,8 +241,12 @@ const Integration = () => {
 			content = <LocationSelector setType={setType} />;
 		} else if (config.integration_type === IntegrationType.CLOUD && !config.oauth2_auth) {
 			content = <OAuthConnect name="GitHub" />;
-		} else if (config.integration_type === IntegrationType.SELFMANAGED && (!config.basic_auth || !config.apikey_auth)) {
-			content = <SelfManagedForm />;
+		} else if (config.integration_type === IntegrationType.SELFMANAGED) {
+			if (!config?.basic_auth?.url) {
+				content = <SelfManagedForm callback={() => setRerender(Date.now())} />;
+			} else {
+				content = <AccountList />;
+			}
 		} else {
 			content = <AccountList />;
 		}
