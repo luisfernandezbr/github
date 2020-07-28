@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -689,6 +690,33 @@ func (g *GithubIntegration) fetchRepos(logger sdk.Logger, client sdk.GraphQLClie
 	return results, nil
 }
 
+// https://docs.github.com/en/graphql/overview/schema-previews
+
+var previewHeaders = []string{
+	"application/vnd.github.package-deletes-preview+json",
+	"application/vnd.github.flash-preview+json",
+	"application/vnd.github.antiope-preview+json",
+	"application/vnd.github.starfox-preview+json",
+	"application/vnd.github.bane-preview+json",
+	"application/vnd.github.stone-crop-preview+json",
+	"application/vnd.github.nebula-preview+json",
+	"application/vnd.github.shadow-cat-preview+json",
+	"application/vnd.github.starfire-preview+json",
+	"application/json",
+	"*/*",
+}
+
+func (g *GithubIntegration) getHeaders(headers map[string]string) map[string]string {
+	headers["Accept"] = strings.Join(previewHeaders, ", ")
+	return headers
+}
+
+func (g *GithubIntegration) getGraphqlURL(theurl string) string {
+	u, _ := url.Parse(theurl)
+	u.Path = "/graphql"
+	return u.String()
+}
+
 func (g *GithubIntegration) newGraphClient(logger sdk.Logger, config sdk.Config) (string, sdk.GraphQLClient, error) {
 	url := "https://api.github.com/graphql"
 
@@ -697,11 +725,13 @@ func (g *GithubIntegration) newGraphClient(logger sdk.Logger, config sdk.Config)
 	if config.APIKeyAuth != nil {
 		apikey := config.APIKeyAuth.APIKey
 		if config.APIKeyAuth.URL != "" {
-			url = config.APIKeyAuth.URL
+			url = g.getGraphqlURL(config.APIKeyAuth.URL)
 		}
-		client = g.manager.GraphQLManager().New(url, map[string]string{
-			"Authorization": "bearer " + apikey,
-		})
+		client = g.manager.GraphQLManager().New(url, g.getHeaders(
+			map[string]string{
+				"Authorization": "bearer " + apikey,
+			}),
+		)
 		sdk.LogInfo(logger, "using apikey authorization")
 	} else if config.OAuth2Auth != nil {
 		authToken := config.OAuth2Auth.AccessToken
@@ -713,19 +743,23 @@ func (g *GithubIntegration) newGraphClient(logger sdk.Logger, config sdk.Config)
 			authToken = token
 		}
 		if config.OAuth2Auth.URL != "" {
-			url = config.OAuth2Auth.URL
+			url = g.getGraphqlURL(config.OAuth2Auth.URL)
 		}
-		client = g.manager.GraphQLManager().New(url, map[string]string{
-			"Authorization": "bearer " + authToken,
-		})
+		client = g.manager.GraphQLManager().New(url, g.getHeaders(
+			map[string]string{
+				"Authorization": "bearer " + authToken,
+			}),
+		)
 		sdk.LogInfo(logger, "using oauth2 authorization")
 	} else if config.BasicAuth != nil {
 		if config.BasicAuth.URL != "" {
-			url = config.BasicAuth.URL
+			url = g.getGraphqlURL(config.BasicAuth.URL)
 		}
-		client = g.manager.GraphQLManager().New(url, map[string]string{
-			"Authorization": "Basic " + base64.StdEncoding.EncodeToString([]byte(config.BasicAuth.Username+":"+config.BasicAuth.Password)),
-		})
+		client = g.manager.GraphQLManager().New(url, g.getHeaders(
+			map[string]string{
+				"Authorization": "Basic " + base64.StdEncoding.EncodeToString([]byte(config.BasicAuth.Username+":"+config.BasicAuth.Password)),
+			}),
+		)
 		sdk.LogInfo(logger, "using basic authorization", "username", config.BasicAuth.Username)
 	} else {
 		return "", nil, fmt.Errorf("supported authorization not provided. support for: apikey, oauth2, basic")
@@ -743,9 +777,11 @@ func (g *GithubIntegration) newHTTPClient(logger sdk.Logger, config sdk.Config) 
 		if config.APIKeyAuth.URL != "" {
 			url = config.APIKeyAuth.URL
 		}
-		client = g.manager.HTTPManager().New(url, map[string]string{
-			"Authorization": "bearer " + apikey,
-		})
+		client = g.manager.HTTPManager().New(url, g.getHeaders(
+			map[string]string{
+				"Authorization": "bearer " + apikey,
+			}),
+		)
 		sdk.LogInfo(logger, "using apikey authorization", "url", url)
 	} else if config.OAuth2Auth != nil {
 		authToken := config.OAuth2Auth.AccessToken
@@ -759,17 +795,21 @@ func (g *GithubIntegration) newHTTPClient(logger sdk.Logger, config sdk.Config) 
 		if config.OAuth2Auth.URL != "" {
 			url = config.OAuth2Auth.URL
 		}
-		client = g.manager.HTTPManager().New(url, map[string]string{
-			"Authorization": "bearer " + authToken,
-		})
+		client = g.manager.HTTPManager().New(url, g.getHeaders(
+			map[string]string{
+				"Authorization": "bearer " + authToken,
+			}),
+		)
 		sdk.LogInfo(logger, "using oauth2 authorization", "url", url)
 	} else if config.BasicAuth != nil {
 		if config.BasicAuth.URL != "" {
 			url = config.BasicAuth.URL
 		}
-		client = g.manager.HTTPManager().New(url, map[string]string{
-			"Authorization": "Basic " + base64.StdEncoding.EncodeToString([]byte(config.BasicAuth.Username+":"+config.BasicAuth.Password)),
-		})
+		client = g.manager.HTTPManager().New(url, g.getHeaders(
+			map[string]string{
+				"Authorization": "Basic " + base64.StdEncoding.EncodeToString([]byte(config.BasicAuth.Username+":"+config.BasicAuth.Password)),
+			}),
+		)
 		sdk.LogInfo(logger, "using basic authorization", "username", config.BasicAuth.Username, "url", url)
 	} else {
 		sdk.LogDebug(logger, "config JSON: "+sdk.Stringify(config))
