@@ -246,6 +246,11 @@ func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 		if obj != nil {
 			objects = []sdk.Model{obj}
 		}
+	case *github.CommitCommentEvent:
+		// NOTE: we don't really have commit comments in the model right now
+	case *github.PullRequestReviewCommentEvent:
+		// NOTE: we don't really have pull request review comments in the model right now
+		break
 	case *github.IssueCommentEvent:
 		repoLogin := getRepoOwnerLogin(v.Repo)
 		if isIssueCommentPR(v) {
