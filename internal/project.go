@@ -90,7 +90,7 @@ func (p repoProject) ToModel(logger sdk.Logger, customerID string, integrationIn
 	kanban.RefID = p.ID
 	kanban.Name = p.Name
 	kanban.Active = true
-	kanban.URL = p.URL
+	kanban.URL = sdk.StringPointer(p.URL)
 	kanban.BoardID = board.ID
 	kanban.UpdatedAt = sdk.TimeToEpoch(p.UpdatedAt)
 	kanban.ID = sdk.NewAgileKanbanID(customerID, p.ID, refType)
