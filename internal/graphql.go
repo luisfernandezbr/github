@@ -724,6 +724,11 @@ func getAllRepoDataQuery(owner, name, label, cursor string) string {
 							}
 						}
 					}
+					labels(first:100){
+						nodes{
+							name
+						}
+					}
 				}
 			}
 		}
