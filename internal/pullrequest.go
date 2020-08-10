@@ -35,6 +35,11 @@ type pullrequest struct {
 	Reviews       pullrequestreviews       `json:"reviews"`
 	Comments      pullrequestcomments      `json:"comments"`
 	TimelineItems pullrequestTimelineItems `json:"timelineItems"`
+	Labels        struct {
+		Nodes []struct {
+			Name string `json:"name"`
+		} `json:"node"`
+	} `json:"labels"`
 }
 
 func (g *GithubIntegration) fromPullRequestEvent(logger sdk.Logger, client sdk.GraphQLClient, userManager *UserManager, control sdk.Control, customerID string, pr *github.PullRequestEvent) (*sdk.SourceCodePullRequest, error) {
@@ -83,6 +88,13 @@ func (g *GithubIntegration) fromPullRequestEvent(logger sdk.Logger, client sdk.G
 		if err != nil {
 			return nil, err
 		}
+
+		result.Labels = make([]string, 0)
+
+		for _, labelNode := range pr.PullRequest.Labels {
+			result.Labels = append(result.Labels, *labelNode.Name)
+		}
+
 		setPullRequestCommits(result, commits)
 		return result, nil
 	default:
@@ -161,6 +173,12 @@ func (pr pullrequest) ToModel(logger sdk.Logger, userManager *UserManager, custo
 	case "MERGED":
 		pullrequest.Status = sdk.SourceCodePullRequestStatusMerged
 	}
+
+	pullrequest.Labels = make([]string, 0)
+	for _, labelNode := range pr.Labels.Nodes {
+		pullrequest.Labels = append(pullrequest.Labels, labelNode.Name)
+	}
+
 	return pullrequest, nil
 }
 
