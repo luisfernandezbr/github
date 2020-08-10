@@ -100,13 +100,13 @@ func (c pullrequestcomment) ToModel(logger sdk.Logger, userManager *UserManager,
 	comment.URL = c.URL
 	comment.Active = true
 	comment.IntegrationInstanceID = sdk.StringPointer(userManager.instanceid)
-	cd, _ := sdk.NewDateWithTime(c.CreatedAt)
+	cd := sdk.NewDateWithTime(c.CreatedAt)
 	comment.CreatedDate = sdk.SourceCodePullRequestCommentCreatedDate{
 		Epoch:   cd.Epoch,
 		Rfc3339: cd.Rfc3339,
 		Offset:  cd.Offset,
 	}
-	ud, _ := sdk.NewDateWithTime(c.UpdatedAt)
+	ud := sdk.NewDateWithTime(c.UpdatedAt)
 	comment.UpdatedDate = sdk.SourceCodePullRequestCommentUpdatedDate{
 		Epoch:   ud.Epoch,
 		Rfc3339: ud.Rfc3339,
