@@ -128,20 +128,20 @@ func (g *GithubIntegration) fetchPullRequestCommits(logger sdk.Logger, client sd
 	return commits, nil
 }
 
-func (g *GithubIntegration) queuePullRequestJob(logger sdk.Logger, client sdk.GraphQLClient, userManager *UserManager, repoOwner string, repoName string, repoID string, cursor string) job {
+func (g *GithubIntegration) queuePullRequestJob(logger sdk.Logger, client sdk.GraphQLClient, userManager *UserManager, repoName string, repoID string, cursor string) job {
+	repoOwner, repoLogin := g.getRepoDetails(repoName)
 	return func(export sdk.Export, pipe sdk.Pipe) error {
 		sdk.LogInfo(logger, "need to run a pull request job starting from "+cursor, "name", repoName, "owner", repoOwner)
 		var variables = map[string]interface{}{
 			"first": defaultPageSize,
 			"after": cursor,
 			"owner": repoOwner,
-			"name":  repoName,
+			"name":  repoLogin,
 		}
 		customerID := export.CustomerID()
-		fullname := repoOwner + "/" + repoName
 		var retryCount int
 		for {
-			sdk.LogDebug(logger, "running queued pullrequests export", "repo", fullname, "after", variables["after"], "limit", variables["first"], "retryCount", retryCount)
+			sdk.LogDebug(logger, "running queued pullrequests export", "repo", repoName, "after", variables["after"], "limit", variables["first"], "retryCount", retryCount)
 			var result repositoryPullrequests
 			g.lock.Lock() // just to prevent too many GH requests
 			if err := client.Query(pullrequestPagedQuery, variables, &result); err != nil {
@@ -153,7 +153,7 @@ func (g *GithubIntegration) queuePullRequestJob(logger sdk.Logger, client sdk.Gr
 					retryCount++
 					variables["first"] = defaultRetryPageSize // back off the page size to see if this will help
 					if retryCount >= 10 {
-						return fmt.Errorf("failed to export after retrying 10 times for %s", fullname)
+						return fmt.Errorf("failed to export after retrying 10 times for %s", repoName)
 					}
 					continue
 				}
@@ -162,7 +162,7 @@ func (g *GithubIntegration) queuePullRequestJob(logger sdk.Logger, client sdk.Gr
 			g.lock.Unlock()
 			retryCount = 0
 			for _, predge := range result.Repository.Pullrequests.Edges {
-				pullrequest, err := predge.Node.ToModel(logger, userManager, customerID, fullname, repoID)
+				pullrequest, err := predge.Node.ToModel(logger, userManager, customerID, repoName, repoID)
 				if err != nil {
 					return fmt.Errorf("failed to convert pull request to model: %w", err)
 				}
@@ -176,7 +176,7 @@ func (g *GithubIntegration) queuePullRequestJob(logger sdk.Logger, client sdk.Gr
 					}
 				}
 				if predge.Node.Reviews.PageInfo.HasNextPage {
-					job := g.queuePullRequestReviewsJob(logger, client, userManager, repoOwner, repoName, repoID, pullrequest.ID, predge.Node.Number, predge.Node.Reviews.PageInfo.EndCursor)
+					job := g.queuePullRequestReviewsJob(logger, client, userManager, repoName, repoID, pullrequest.ID, predge.Node.Number, predge.Node.Reviews.PageInfo.EndCursor)
 					if err := job(export, pipe); err != nil {
 						return err
 					}
@@ -191,7 +191,7 @@ func (g *GithubIntegration) queuePullRequestJob(logger sdk.Logger, client sdk.Gr
 				}
 				if predge.Node.Commits.PageInfo.HasNextPage {
 					// fetch all the remaining paged commits
-					morecommits, err := g.fetchPullRequestCommits(logger, client, userManager, export, customerID, fullname, predge.Node.ID, pullrequest.RepoID, predge.Node.Commits.PageInfo.EndCursor)
+					morecommits, err := g.fetchPullRequestCommits(logger, client, userManager, export, customerID, repoName, predge.Node.ID, pullrequest.RepoID, predge.Node.Commits.PageInfo.EndCursor)
 					if err != nil {
 						return err
 					}
@@ -222,21 +222,21 @@ func (g *GithubIntegration) queuePullRequestJob(logger sdk.Logger, client sdk.Gr
 	}
 }
 
-func (g *GithubIntegration) queuePullRequestCommentsJob(logger sdk.Logger, client sdk.GraphQLClient, userManager *UserManager, repoOwner string, repoName string, repoID string, prID string, prNumber int, cursor string) job {
+func (g *GithubIntegration) queuePullRequestCommentsJob(logger sdk.Logger, client sdk.GraphQLClient, userManager *UserManager, repoName string, repoID string, prID string, prNumber int, cursor string) job {
+	repoOwner, repoLogin := g.getRepoDetails(repoName)
 	return func(export sdk.Export, pipe sdk.Pipe) error {
 		sdk.LogInfo(logger, "need to run a pull request comments job starting from "+cursor, "name", repoName, "owner", repoOwner)
 		var variables = map[string]interface{}{
 			"first":  defaultPageSize,
 			"after":  cursor,
 			"owner":  repoOwner,
-			"name":   repoName,
+			"name":   repoLogin,
 			"number": prNumber,
 		}
 		customerID := export.CustomerID()
-		fullname := repoOwner + "/" + repoName
 		var retryCount int
 		for {
-			sdk.LogDebug(logger, "running queued pullrequests comments export", "number", prID, "repo", fullname, "after", variables["after"], "limit", variables["first"], "retryCount", retryCount)
+			sdk.LogDebug(logger, "running queued pullrequests comments export", "number", prID, "repo", repoName, "after", variables["after"], "limit", variables["first"], "retryCount", retryCount)
 			var result struct {
 				RateLimit  rateLimit `json:"rateLimit"`
 				Repository struct {
@@ -255,7 +255,7 @@ func (g *GithubIntegration) queuePullRequestCommentsJob(logger sdk.Logger, clien
 					retryCount++
 					variables["first"] = defaultRetryPageSize // back off the page size to see if this will help
 					if retryCount >= 10 {
-						return fmt.Errorf("failed to export after retrying 10 times for %s", fullname)
+						return fmt.Errorf("failed to export after retrying 10 times for %s", repoName)
 					}
 					continue
 				}
@@ -284,23 +284,23 @@ func (g *GithubIntegration) queuePullRequestCommentsJob(logger sdk.Logger, clien
 	}
 }
 
-func (g *GithubIntegration) queuePullRequestReviewsJob(logger sdk.Logger, client sdk.GraphQLClient, userManager *UserManager, repoOwner string, repoName string, repoID string, prID string, prNumber int, cursor string) job {
+func (g *GithubIntegration) queuePullRequestReviewsJob(logger sdk.Logger, client sdk.GraphQLClient, userManager *UserManager, repoName string, repoID string, prID string, prNumber int, cursor string) job {
+	repoOwner, repoLogin := g.getRepoDetails(repoName)
 	return func(export sdk.Export, pipe sdk.Pipe) error {
-		sdk.LogInfo(logger, "need to run a pull request reviews job starting from "+cursor, "name", repoName, "owner", repoOwner)
+		sdk.LogInfo(logger, "need to run a pull request reviews job starting from "+cursor, "name", repoName)
 		var variables = map[string]interface{}{
 			"first":  defaultPageSize,
 			"owner":  repoOwner,
-			"name":   repoName,
+			"name":   repoLogin,
 			"number": prNumber,
 		}
 		if cursor != "" {
 			variables["after"] = cursor
 		}
 		customerID := export.CustomerID()
-		fullname := repoOwner + "/" + repoName
 		var retryCount int
 		for {
-			sdk.LogDebug(logger, "running queued pullrequests reviews export", "number", prID, "repo", fullname, "after", variables["after"], "limit", variables["first"], "retryCount", retryCount)
+			sdk.LogDebug(logger, "running queued pullrequests reviews export", "number", prID, "repo", repoName, "after", variables["after"], "limit", variables["first"], "retryCount", retryCount)
 			var result struct {
 				RateLimit  rateLimit `json:"rateLimit"`
 				Repository struct {
@@ -319,7 +319,7 @@ func (g *GithubIntegration) queuePullRequestReviewsJob(logger sdk.Logger, client
 					retryCount++
 					variables["first"] = defaultRetryPageSize // back off the page size to see if this will help
 					if retryCount >= 10 {
-						return fmt.Errorf("failed to export after retrying 10 times for %s", fullname)
+						return fmt.Errorf("failed to export after retrying 10 times for %s", repoName)
 					}
 					continue
 				}
@@ -378,6 +378,7 @@ func (g *GithubIntegration) fetchAllRepos(logger sdk.Logger, client sdk.GraphQLC
 		}
 		retryCount = 0
 		for _, repo := range result.Data.Repositories.Nodes {
+			sdk.LogDebug(logger, "found a repo", "name", repo.Name)
 			repos = append(repos, repo)
 		}
 		if err := g.checkForRateLimit(logger, export, result.RateLimit); err != nil {
@@ -412,10 +413,11 @@ func (g *GithubIntegration) fetchViewer(logger sdk.Logger, client sdk.GraphQLCli
 	}
 }
 
-func (g *GithubIntegration) fetchAllRepoMilestones(logger sdk.Logger, client sdk.GraphQLClient, userManager *UserManager, export sdk.Export, repoLogin string, repoName, repoRefID string, historical bool) error {
+func (g *GithubIntegration) fetchAllRepoMilestones(logger sdk.Logger, client sdk.GraphQLClient, userManager *UserManager, export sdk.Export, repoName, repoRefID string, historical bool) error {
+	repoOwner, repoLogin := g.getRepoDetails(repoName)
 	var variables = map[string]interface{}{
-		"owner": repoLogin,
-		"name":  repoName,
+		"owner": repoOwner,
+		"name":  repoLogin,
 	}
 	var after, before string
 	var retryCount int
@@ -424,9 +426,8 @@ func (g *GithubIntegration) fetchAllRepoMilestones(logger sdk.Logger, client sdk
 	integrationInstanceID := export.IntegrationInstanceID()
 	projectID := sdk.NewWorkProjectID(customerID, repoRefID, refType)
 	pipe := export.Pipe()
-	name := repoLogin + "/" + repoName
 	state := export.State()
-	state.Get("milestones_"+name, &before)
+	state.Get("milestones_"+repoName, &before)
 	if before != "" {
 		variables["before"] = before
 	}
@@ -448,7 +449,7 @@ func (g *GithubIntegration) fetchAllRepoMilestones(logger sdk.Logger, client sdk
 		}
 		retryCount = 0
 		for _, node := range result.Repository.Milestones.Nodes {
-			issue, err := node.ToModel(logger, userManager, customerID, integrationInstanceID, name, projectID)
+			issue, err := node.ToModel(logger, userManager, customerID, integrationInstanceID, repoName, projectID)
 			if err != nil {
 				return err
 			}
@@ -470,15 +471,21 @@ func (g *GithubIntegration) fetchAllRepoMilestones(logger sdk.Logger, client sdk
 		after = result.Repository.Milestones.PageInfo.EndCursor
 	}
 	if first != "" {
-		return state.Set("milestones_"+name, first)
+		return state.Set("milestones_"+repoName, first)
 	}
 	return nil
 }
 
-func (g *GithubIntegration) fetchAllRepoIssues(logger sdk.Logger, client sdk.GraphQLClient, userManager *UserManager, export sdk.Export, repoLogin string, repoName, repoRefID string, historical bool) error {
+func (g *GithubIntegration) getRepoDetails(repoName string) (string, string) {
+	tok := strings.Split(repoName, "/")
+	return tok[0], tok[1]
+}
+
+func (g *GithubIntegration) fetchAllRepoIssues(logger sdk.Logger, client sdk.GraphQLClient, userManager *UserManager, export sdk.Export, repoName, repoRefID string, historical bool) error {
+	repoOwner, repoLogin := g.getRepoDetails(repoName)
 	var variables = map[string]interface{}{
-		"owner": repoLogin,
-		"name":  repoName,
+		"owner": repoOwner,
+		"name":  repoLogin,
 	}
 	var after, before string
 	var retryCount int
@@ -487,9 +494,8 @@ func (g *GithubIntegration) fetchAllRepoIssues(logger sdk.Logger, client sdk.Gra
 	integrationInstanceID := export.IntegrationInstanceID()
 	projectID := sdk.NewWorkProjectID(customerID, repoRefID, refType)
 	pipe := export.Pipe()
-	name := repoLogin + "/" + repoName
 	state := export.State()
-	state.Get("issues_"+name, &before)
+	state.Get("issues_"+repoName, &before)
 	if before != "" {
 		variables["before"] = before
 	}
@@ -511,7 +517,7 @@ func (g *GithubIntegration) fetchAllRepoIssues(logger sdk.Logger, client sdk.Gra
 		}
 		retryCount = 0
 		for _, node := range result.Repository.Issues.Nodes {
-			issue, err := node.ToModel(logger, userManager, customerID, integrationInstanceID, name, projectID)
+			issue, err := node.ToModel(logger, userManager, customerID, integrationInstanceID, repoName, projectID)
 			if err != nil {
 				return err
 			}
@@ -542,16 +548,17 @@ func (g *GithubIntegration) fetchAllRepoIssues(logger sdk.Logger, client sdk.Gra
 		after = result.Repository.Issues.PageInfo.EndCursor
 	}
 	if first != "" {
-		return state.Set("issues_"+name, first)
+		return state.Set("issues_"+repoName, first)
 	}
 	return nil
 }
 
-func (g *GithubIntegration) fetchRepoProject(logger sdk.Logger, client sdk.GraphQLClient, pipe sdk.Pipe, control sdk.Control, customerID, integrationInstanceID, repoOwner, repoName, repoRefID string, num int) error {
+func (g *GithubIntegration) fetchRepoProject(logger sdk.Logger, client sdk.GraphQLClient, pipe sdk.Pipe, control sdk.Control, customerID, integrationInstanceID, repoName, repoRefID string, num int) error {
+	repoOwner, repoLogin := g.getRepoDetails(repoName)
 	var retryCount int
 	variables := map[string]interface{}{
 		"owner": repoOwner,
-		"name":  repoName,
+		"name":  repoLogin,
 		"num":   num,
 	}
 	for {
@@ -586,11 +593,12 @@ func (g *GithubIntegration) fetchRepoProject(logger sdk.Logger, client sdk.Graph
 	}
 }
 
-func (g *GithubIntegration) fetchRepoProjects(logger sdk.Logger, client sdk.GraphQLClient, export sdk.Export, repoOwner, repoName, repoRefID string) error {
+func (g *GithubIntegration) fetchRepoProjects(logger sdk.Logger, client sdk.GraphQLClient, export sdk.Export, repoName, repoRefID string) error {
+	repoOwner, repoLogin := g.getRepoDetails(repoName)
 	var retryCount int
 	variables := map[string]interface{}{
 		"owner": repoOwner,
-		"name":  repoName,
+		"name":  repoLogin,
 	}
 	for {
 		sdk.LogDebug(logger, "running repo project query", "retryCount", retryCount, "name", repoName)
@@ -1072,7 +1080,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 				reviewCount++
 			}
 			if predge.Node.Reviews.PageInfo.HasNextPage {
-				jobs = append(jobs, g.queuePullRequestReviewsJob(logger, client, userManager, r.Login, r.RepoName, repo.GetID(), pullrequest.ID, predge.Node.Number, predge.Node.Reviews.PageInfo.EndCursor))
+				jobs = append(jobs, g.queuePullRequestReviewsJob(logger, client, userManager, r.Name, repo.GetID(), pullrequest.ID, predge.Node.Number, predge.Node.Reviews.PageInfo.EndCursor))
 			}
 			for _, commentedge := range predge.Node.Comments.Edges {
 				prcomment, err := commentedge.Node.ToModel(logger, userManager, customerID, repo.ID, pullrequest.ID)
@@ -1085,7 +1093,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 				commentCount++
 			}
 			if predge.Node.Comments.PageInfo.HasNextPage {
-				jobs = append(jobs, g.queuePullRequestCommentsJob(logger, client, userManager, r.Login, r.RepoName, repo.GetID(), pullrequest.ID, predge.Node.Number, predge.Node.Comments.PageInfo.EndCursor))
+				jobs = append(jobs, g.queuePullRequestCommentsJob(logger, client, userManager, r.Name, repo.GetID(), pullrequest.ID, predge.Node.Number, predge.Node.Comments.PageInfo.EndCursor))
 			}
 			commits := make([]*sdk.SourceCodePullRequestCommit, 0)
 			for _, commitedge := range predge.Node.Commits.Edges {
@@ -1122,17 +1130,17 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 
 		if r.HasIssuesEnabled {
 			sdk.LogDebug(logger, "issues enabled for this repo", "name", node.Name)
-			if err := g.fetchAllRepoIssues(logger, client, userManager, export, r.Login, r.RepoName, r.ID, export.Historical()); err != nil {
+			if err := g.fetchAllRepoIssues(logger, client, userManager, export, r.Name, r.ID, export.Historical()); err != nil {
 				return fmt.Errorf("error fetching repo issues: %w", err)
 			}
-			if err := g.fetchAllRepoMilestones(logger, client, userManager, export, r.Login, r.RepoName, r.ID, export.Historical()); err != nil {
+			if err := g.fetchAllRepoMilestones(logger, client, userManager, export, r.Name, r.ID, export.Historical()); err != nil {
 				return fmt.Errorf("error fetching repo milestones: %w", err)
 			}
 		}
 
 		if project != nil && r.HasProjectsEnabled {
 			sdk.LogDebug(logger, "projects enabled for this repo", "name", node.Name)
-			if err := g.fetchRepoProjects(logger, client, export, r.Login, r.RepoName, r.ID); err != nil {
+			if err := g.fetchRepoProjects(logger, client, export, r.Name, r.ID); err != nil {
 				return fmt.Errorf("error fetching repo projects: %w", err)
 			}
 		}
@@ -1143,7 +1151,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 		}
 		if node.Pullrequests.PageInfo.HasNextPage {
 			// queue the pull requests for the next page
-			jobs = append(jobs, g.queuePullRequestJob(logger, client, userManager, r.Login, r.RepoName, repo.GetID(), node.Pullrequests.PageInfo.EndCursor))
+			jobs = append(jobs, g.queuePullRequestJob(logger, client, userManager, r.Name, repo.GetID(), node.Pullrequests.PageInfo.EndCursor))
 		}
 	}
 

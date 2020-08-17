@@ -444,15 +444,10 @@ type repoWithNameResult struct {
 }
 
 func generateAllReposQuery(after string, scope string) string {
-	var definitionLine, argLine string
-	if after != "" {
-		definitionLine = ", $after: String! "
-		argLine = " after: $after "
-	}
 	return fmt.Sprintf(`
-	query GetAllRepos($login: String!, $first: Int! %[1]s) {
-		data: %[3]s(login: $login) {
-			repositories(first: $first %[2]s orderBy: {field: PUSHED_AT, direction: DESC}) {
+	query GetAllRepos($login: String!, $first: Int!, $after: String) {
+		data: %s(login: $login) {
+			repositories(first: $first after: $after orderBy: {field: PUSHED_AT, direction: DESC}) {
 				totalCount
 				pageInfo {
 					hasNextPage
@@ -476,7 +471,7 @@ func generateAllReposQuery(after string, scope string) string {
 			remaining
 			resetAt
 		}
-	}`, definitionLine, argLine, scope)
+	}`, scope)
 }
 
 var repoProjectsQuery = `

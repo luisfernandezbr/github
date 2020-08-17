@@ -297,15 +297,12 @@ func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 			objects = []sdk.Model{issue}
 		}
 	case *github.ProjectEvent:
-		repoLogin := getRepoOwnerLogin(v.Repo)
-		return g.fetchRepoProject(g.logger, client, webhook.Pipe(), webhook, webhook.CustomerID(), webhook.IntegrationInstanceID(), repoLogin, v.Repo.GetName(), v.Repo.GetNodeID(), v.Project.GetNumber())
+		return g.fetchRepoProject(g.logger, client, webhook.Pipe(), webhook, webhook.CustomerID(), webhook.IntegrationInstanceID(), v.Repo.GetFullName(), v.Repo.GetNodeID(), v.Project.GetNumber())
 	case *github.ProjectCardEvent:
-		repoLogin := getRepoOwnerLogin(v.Repo)
-		return g.fetchRepoProject(g.logger, client, webhook.Pipe(), webhook, webhook.CustomerID(), webhook.IntegrationInstanceID(), repoLogin, v.Repo.GetName(), v.Repo.GetNodeID(), int(v.GetProjectCard().GetProjectID()))
+		return g.fetchRepoProject(g.logger, client, webhook.Pipe(), webhook, webhook.CustomerID(), webhook.IntegrationInstanceID(), v.Repo.GetFullName(), v.Repo.GetNodeID(), int(v.GetProjectCard().GetProjectID()))
 	case *github.ProjectColumnEvent:
-		repoLogin := getRepoOwnerLogin(v.Repo)
 		num := getProjectIDfromURL(v.ProjectColumn.GetProjectURL())
-		return g.fetchRepoProject(g.logger, client, webhook.Pipe(), webhook, webhook.CustomerID(), webhook.IntegrationInstanceID(), repoLogin, v.Repo.GetName(), v.Repo.GetNodeID(), num)
+		return g.fetchRepoProject(g.logger, client, webhook.Pipe(), webhook, webhook.CustomerID(), webhook.IntegrationInstanceID(), v.Repo.GetFullName(), v.Repo.GetNodeID(), num)
 	case *github.MilestoneEvent:
 		repoLogin := getRepoOwnerLogin(v.Repo)
 		userManager := NewUserManager(webhook.CustomerID(), []string{repoLogin}, webhook, webhook.State(), webhook.Pipe(), g, webhook.IntegrationInstanceID(), false)
