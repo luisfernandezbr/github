@@ -21,10 +21,6 @@ type GithubIntegration struct {
 
 var _ sdk.Integration = (*GithubIntegration)(nil)
 
-func (g *GithubIntegration) Validate(validate sdk.Validate) (result map[string]interface{}, err error) {
-	return
-}
-
 // Start is called when the integration is starting up
 func (g *GithubIntegration) Start(logger sdk.Logger, config sdk.Config, manager sdk.Manager) error {
 	g.logger = sdk.LogWith(logger, "pkg", "github")

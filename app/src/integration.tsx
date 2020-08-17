@@ -63,13 +63,13 @@ const githubOrgToAccount = (data: any, isPublic: boolean): Account => {
 };
 
 const fetchViewerOrgsOAuth = async(api_key: string) => {
-	const [data] = await Graphql.query('https://api.github.com/graphql', viewerOrgsGQL, undefined, {Authorization: `Bearer ${api_key}`});
+	const [data] = await Graphql.query('https://api.github.com/graphql', viewerOrgsGQL, undefined, {Authorization: `Bearer ${api_key}`}, false);
 	return data;
 };
 
 const fetchViewerOrgsBasic = async(auth: IAppBasicAuth) => {
 	const enc = btoa(auth.username + ":" + auth.password);
-	const [data] = await Graphql.query(auth.url!, viewerOrgsGQL, undefined, {Authorization: `Basic ${enc}`});
+	const [data] = await Graphql.query(auth.url!, viewerOrgsGQL, undefined, {Authorization: `Basic ${enc}`}, false);
 	return data;
 };
 
@@ -175,6 +175,7 @@ const Integration = () => {
 		if (!loading && authorization?.oauth2_auth) {
 			config.integration_type = IntegrationType.CLOUD;
 			config.oauth2_auth = {
+				date_ts: Date.now(),
 				access_token: authorization.oauth2_auth.access_token,
 				refresh_token: authorization.oauth2_auth.refresh_token,
 				scopes: authorization.oauth2_auth.scopes,
@@ -201,6 +202,7 @@ const Integration = () => {
 					const profile = JSON.parse(atob(decodeURIComponent(v)));
 					config.integration_type = IntegrationType.CLOUD;
 					config.oauth2_auth = {
+						date_ts: Date.now(),
 						access_token: profile.Integration.auth.accessToken,
 						scopes: profile.Integration.auth.scopes,
 					};
