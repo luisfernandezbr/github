@@ -1,7 +1,7 @@
 name: GitHub
 ref_type: github
 description: This is the official GitHub integration for Pinpoint
-avatar_url: https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png
+avatar_url: "https://img.icons8.com/color/240/000000/github--v1.png"
 capabilities:
   - agent.Mutation
   - auth.OAuth2
@@ -24,7 +24,11 @@ installation:
   modes:
     - cloud
     - selfmanaged
+  selfmanaged:
+    authorizations:
+      - oauth2
+      - apikey
   cloud:
-    network:
-      hostnames:
-        - "api.github.com"
+    authorizations:
+      - oauth2
+      - apikey
