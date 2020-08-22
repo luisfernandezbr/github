@@ -5,7 +5,6 @@ avatar_url: "https://img.icons8.com/color/240/000000/github--v1.png"
 capabilities:
   - agent.Mutation
   - auth.OAuth2
-  - auth.BasicAuth
   - sourcecode.Repo
   - sourcecode.User
   - sourcecode.Commit
