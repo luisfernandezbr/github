@@ -393,7 +393,7 @@ func (g *GithubIntegration) fetchAllRepos(logger sdk.Logger, client sdk.GraphQLC
 	return repos, nil
 }
 
-func (g *GithubIntegration) fetchViewer(logger sdk.Logger, client sdk.GraphQLClient, export sdk.Export) (string, error) {
+func (g *GithubIntegration) fetchViewer(logger sdk.Logger, client sdk.GraphQLClient, export sdk.Control) (string, error) {
 	var retryCount int
 	for {
 		sdk.LogDebug(logger, "running viewer query", "retryCount", retryCount)
@@ -743,7 +743,7 @@ func (g *GithubIntegration) newGraphClient(logger sdk.Logger, config sdk.Config)
 		sdk.LogInfo(logger, "using apikey authorization")
 	} else if config.OAuth2Auth != nil {
 		authToken := config.OAuth2Auth.AccessToken
-		if config.OAuth2Auth.RefreshToken != nil {
+		if config.OAuth2Auth.RefreshToken != nil && *config.OAuth2Auth.RefreshToken != "" {
 			token, err := g.manager.AuthManager().RefreshOAuth2Token(refType, *config.OAuth2Auth.RefreshToken)
 			if err != nil {
 				return "", nil, fmt.Errorf("error refreshing oauth2 access token: %w", err)
@@ -793,7 +793,7 @@ func (g *GithubIntegration) newHTTPClient(logger sdk.Logger, config sdk.Config) 
 		sdk.LogInfo(logger, "using apikey authorization", "url", url)
 	} else if config.OAuth2Auth != nil {
 		authToken := config.OAuth2Auth.AccessToken
-		if config.OAuth2Auth.RefreshToken != nil {
+		if config.OAuth2Auth.RefreshToken != nil && *config.OAuth2Auth.RefreshToken != "" {
 			token, err := g.manager.AuthManager().RefreshOAuth2Token(refType, *config.OAuth2Auth.RefreshToken)
 			if err != nil {
 				return "", nil, fmt.Errorf("error refreshing oauth2 access token: %w", err)
