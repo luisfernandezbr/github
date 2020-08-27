@@ -432,7 +432,7 @@ type viewerResult struct {
 func generateViewerLogin() string {
 	return `query viewer {
 		viewer {
-		  login
+			login
 		}
 	 }`
 }
@@ -568,10 +568,10 @@ func getAllRepoDataQuery(owner, name, label, cursor string) string {
 		}
 		labels(first: 20, orderBy:{field:CREATED_AT, direction:ASC}) {
 			nodes {
-			  id
-			  name
-			  color
-			  description
+				id
+				name
+				color
+				description
 			}
 		}
 		pullRequests(first: 10, orderBy: {field: UPDATED_AT, direction: DESC}, states:[OPEN, MERGED, CLOSED] %s) {
@@ -714,23 +714,23 @@ func getAllRepoDataQuery(owner, name, label, cursor string) string {
 							startCursor
 							endCursor
 						}
-            edges {
-              cursor
-              node {
-                id
-                databaseId
-                requestedReviewer {
-                  ...on User {
+						edges {
+							cursor
+							node {
+								id
+								databaseId
+								requestedReviewer {
+									...on User {
 										type: __typename
-                    id
-                    login
+										id
+										login
 										email
 										name
-                  }
-                }
-              }
-            }
-          }
+									}
+								}
+							}
+						}
+					}
 					comments(first: 10) {
 						totalCount
 						pageInfo {
@@ -780,7 +780,7 @@ query getIssues($name: String!, $owner: String!, $before: String, $after: String
 		resetAt
 	}
 	repository(name: $name, owner: $owner) {
-	  issues(first: 100, before: $before, after: $after, orderBy: {field: UPDATED_AT, direction: DESC}, states: [OPEN, CLOSED]) {
+		issues(first: 100, before: $before, after: $after, orderBy: {field: UPDATED_AT, direction: DESC}, states: [OPEN, CLOSED]) {
 		totalCount
 		pageInfo {
 			hasNextPage
@@ -804,27 +804,27 @@ query getIssues($name: String!, $owner: String!, $before: String, $after: String
 			}
 			labels(first: 20, orderBy: {field: CREATED_AT, direction: ASC}) {
 				nodes {
-				  id
-				  name
-				  color
-				  description
+					id
+					name
+					color
+					description
 				}
 			}
 			comments(last: 100) {
 				totalCount
 				pageInfo {
-				  startCursor
-				  endCursor
-				  hasNextPage
-				  hasPreviousPage
+					startCursor
+					endCursor
+					hasNextPage
+					hasPreviousPage
 				}
 				nodes {
-				  id
-				  url
-				  body
-				  createdAt
-				  updatedAt
-				  author {
+					id
+					url
+					body
+					createdAt
+					updatedAt
+					author {
 					 type: __typename
 					 avatarUrl
 					 login
@@ -834,15 +834,15 @@ query getIssues($name: String!, $owner: String!, $before: String, $after: String
 						email
 						name
 					 }
-				  }
+					}
 				}
 			}
 			assignees(last: 1) {
-			  nodes {
+				nodes {
 				 id
 				 login
 				 avatarUrl
-			  }
+				}
 			}
 			author {
 				type: __typename
@@ -856,7 +856,7 @@ query getIssues($name: String!, $owner: String!, $before: String, $after: String
 				}
 			}
 		 }
-	  }
+		}
 	}
  }
 `
@@ -945,9 +945,9 @@ query getMilestones($name: String!, $owner: String!, $before: String, $after: St
 var pullrequestNodeIDQuery = `
 query getPRNodeID($name: String!, $owner: String!, $number: Int!) { 
 	repository(name: $name owner: $owner){
-	  pullRequest(number:$number) {
+		pullRequest(number:$number) {
 		 id
-	  }
+		}
 	}
 }`
 
