@@ -134,19 +134,19 @@ func (r repository) ToProjectModel(repo *sdk.SourceCodeRepo) *sdk.WorkProject {
 	project.CustomerID = repo.CustomerID
 	project.UpdatedAt = repo.UpdatedAt
 	project.IssueTypes = []sdk.WorkProjectIssueTypes{
-		sdk.WorkProjectIssueTypes{
+		{
 			Name:  "Epic",
 			RefID: "epic",
 		},
-		sdk.WorkProjectIssueTypes{
+		{
 			Name:  "Task",
 			RefID: "task",
 		},
-		sdk.WorkProjectIssueTypes{
+		{
 			Name:  "Bug",
 			RefID: "bug",
 		},
-		sdk.WorkProjectIssueTypes{
+		{
 			Name:  "Enhancement",
 			RefID: "enhancement",
 		},

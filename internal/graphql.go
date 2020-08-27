@@ -153,6 +153,23 @@ var pullrequestFields = `
 			}
 		}
 	}
+	reviewRequests (first: 10) {
+		edges {
+			cursor
+			node {
+				id
+				requestedReviewer {
+					...on User {
+						login
+						id
+						email
+						name
+						type: __typename
+					}
+				}
+			}
+		}
+	}
 	comments(first: 10) {
 		totalCount
 		pageInfo {
@@ -670,7 +687,7 @@ func getAllRepoDataQuery(owner, name, label, cursor string) string {
 							endCursor
 						}
 						edges {
-						cursor
+							cursor
 							node {
 								id
 								state
@@ -690,6 +707,30 @@ func getAllRepoDataQuery(owner, name, label, cursor string) string {
 							}
 						}
 					}
+					reviewRequests (first: 10) {
+						totalCount
+						pageInfo {
+							hasNextPage
+							startCursor
+							endCursor
+						}
+            edges {
+              cursor
+              node {
+                id
+                databaseId
+                requestedReviewer {
+                  ...on User {
+										type: __typename
+                    id
+                    login
+										email
+										name
+                  }
+                }
+              }
+            }
+          }
 					comments(first: 10) {
 						totalCount
 						pageInfo {

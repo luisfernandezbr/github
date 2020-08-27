@@ -181,6 +181,15 @@ func (g *GithubIntegration) queuePullRequestJob(logger sdk.Logger, client sdk.Gr
 						return err
 					}
 				}
+				for _, reviewreqedge := range predge.Node.ReviewRequests.Edges {
+					prreviewrequest, err := reviewreqedge.Node.ToModel(logger, userManager, customerID, repoID, pullrequest.ID)
+					if err != nil {
+						return err
+					}
+					if err := pipe.Write(prreviewrequest); err != nil {
+						return err
+					}
+				}
 				commits := make([]*sdk.SourceCodePullRequestCommit, 0)
 				for _, commitedge := range predge.Node.Commits.Edges {
 					prcommit, err := commitedge.Node.Commit.ToModel(logger, userManager, customerID, repoID, pullrequest.ID)
@@ -952,7 +961,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 	userManager := NewUserManager(customerID, orgs, export, state, pipe, g, instanceID, export.Historical())
 	jobs := make([]job, 0)
 	started := time.Now()
-	var repoCount, prCount, reviewCount, commitCount, commentCount int
+	var repoCount, prCount, reviewCount, reviewRequestCount, commitCount, commentCount int
 	var hasPreviousRepos bool
 	previousRepos := make(map[string]*sdk.SourceCodeRepo)
 	previousProjects := make(map[string]*sdk.WorkProject)
@@ -1082,6 +1091,19 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 			if predge.Node.Reviews.PageInfo.HasNextPage {
 				jobs = append(jobs, g.queuePullRequestReviewsJob(logger, client, userManager, r.Name, repo.GetID(), pullrequest.ID, predge.Node.Number, predge.Node.Reviews.PageInfo.EndCursor))
 			}
+			for _, reviewRequestedge := range predge.Node.ReviewRequests.Edges {
+				prreview, err := reviewRequestedge.Node.ToModel(logger, userManager, customerID, repo.ID, pullrequest.ID)
+				if err != nil {
+					return err
+				}
+				if err := pipe.Write(prreview); err != nil {
+					return fmt.Errorf("error writing review request for pull request %s for repo: %v. %w", pullrequest.ID, r.Name, err)
+				}
+				reviewRequestCount++
+			}
+			if predge.Node.ReviewRequests.PageInfo.HasNextPage {
+				// TODO(robin): queue job if has nextpage, for prs with >10 reviewers requested
+			}
 			for _, commentedge := range predge.Node.Comments.Edges {
 				prcomment, err := commentedge.Node.ToModel(logger, userManager, customerID, repo.ID, pullrequest.ID)
 				if err != nil {
@@ -1164,7 +1186,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 	}
 	sdk.LogDebug(logger, "saved previous state", "repos", len(previousRepos), "projects", len(previousProjects))
 
-	sdk.LogInfo(logger, "initial export completed", "duration", time.Since(started), "repoCount", repoCount, "prCount", prCount, "reviewCount", reviewCount, "commitCount", commitCount, "commentCount", commentCount, "jobs", len(jobs))
+	sdk.LogInfo(logger, "initial export completed", "duration", time.Since(started), "repoCount", repoCount, "prCount", prCount, "reviewCount", reviewCount, "reviewRequestCount", reviewRequestCount, "commitCount", commitCount, "commentCount", commentCount, "jobs", len(jobs))
 
 	_, skipHistorical := g.config.GetBool("skip-historical")
 

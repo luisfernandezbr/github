@@ -229,12 +229,22 @@ func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 	case *github.PullRequestEvent:
 		repoLogin := getRepoOwnerLogin(v.Repo)
 		userManager := NewUserManager(webhook.CustomerID(), []string{repoLogin}, webhook, webhook.State(), webhook.Pipe(), g, webhook.IntegrationInstanceID(), false)
-		obj, err := g.fromPullRequestEvent(g.logger, client, userManager, webhook, webhook.CustomerID(), v)
-		if err != nil {
-			return err
-		}
-		if obj != nil {
-			objects = []sdk.Model{obj}
+		if v.Action != nil && (*v.Action == "review_requested" || *v.Action == "review_request_removed") {
+			obj, err := g.fromPullRequestReviewRequestedEvent(g.logger, client, userManager, webhook, webhook.CustomerID(), v)
+			if err != nil {
+				return err
+			}
+			if obj != nil {
+				objects = []sdk.Model{obj}
+			}
+		} else {
+			obj, err := g.fromPullRequestEvent(g.logger, client, userManager, webhook, webhook.CustomerID(), v)
+			if err != nil {
+				return err
+			}
+			if obj != nil {
+				objects = []sdk.Model{obj}
+			}
 		}
 	case *github.PullRequestReviewEvent:
 		repoLogin := getRepoOwnerLogin(v.Repo)
