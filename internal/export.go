@@ -422,6 +422,29 @@ func (g *GithubIntegration) fetchViewer(logger sdk.Logger, client sdk.GraphQLCli
 	}
 }
 
+// fetchOrgs will fetch all orgs this user is a member of
+func (g *GithubIntegration) fetchOrgs(logger sdk.Logger, client sdk.GraphQLClient, export sdk.Control) ([]org, error) {
+	var allorgs allOrgsResult
+	var orgs []org
+	for {
+		if err := client.Query(allOrgsQuery, map[string]interface{}{"first": 100}, &allorgs); err != nil {
+			if g.checkForAbuseDetection(logger, export, err) {
+				continue
+			}
+			return nil, err
+		}
+		for _, node := range allorgs.Viewer.Organizations.Nodes {
+			if node.IsMember {
+				orgs = append(orgs, node)
+			} else {
+				sdk.LogInfo(logger, "skipping "+node.Login+" the authorized user is not a member of this org")
+			}
+		}
+		break
+	}
+	return orgs, nil
+}
+
 func (g *GithubIntegration) fetchAllRepoMilestones(logger sdk.Logger, client sdk.GraphQLClient, userManager *UserManager, export sdk.Export, repoName, repoRefID string, historical bool) error {
 	repoOwner, repoLogin := g.getRepoDetails(repoName)
 	var variables = map[string]interface{}{
@@ -860,22 +883,12 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 	var users []string
 	if config.Accounts == nil {
 		// first we're going to fetch all the organizations that the viewer is a member of if accounts if nil
-		var allorgs allOrgsResult
-		for {
-			if err := client.Query(allOrgsQuery, map[string]interface{}{"first": 100}, &allorgs); err != nil {
-				if g.checkForAbuseDetection(logger, export, err) {
-					continue
-				}
-				return err
-			}
-			for _, node := range allorgs.Viewer.Organizations.Nodes {
-				if node.IsMember {
-					orgs = append(orgs, node.Login)
-				} else {
-					sdk.LogInfo(logger, "skipping "+node.Login+" the authorized user is not a member of this org")
-				}
-			}
-			break
+		fullorgs, err := g.fetchOrgs(logger, client, export)
+		if err != nil {
+			return fmt.Errorf("error fetching orgs: %w", err)
+		}
+		for _, org := range fullorgs {
+			orgs = append(orgs, org.Name)
 		}
 		viewer, err := g.fetchViewer(logger, client, export)
 		if err != nil {

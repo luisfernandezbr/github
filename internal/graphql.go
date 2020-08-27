@@ -334,6 +334,7 @@ type allOrgsResult struct {
 }
 
 type org struct {
+	ID       string `json:"id"`
 	Name     string `json:"name"`
 	Login    string `json:"login"`
 	IsMember bool   `json:"viewerIsAMember"`
@@ -413,6 +414,7 @@ query GetAllOrgs($first: Int!) {
 	viewer {
 		organizations(first: $first) {
 			nodes {
+				id
 				name
 				login
 				viewerIsAMember
@@ -423,15 +425,19 @@ query GetAllOrgs($first: Int!) {
 }
 `
 
+type viewer struct {
+	ID    string `json:"id"`
+	Login string `json:"login"`
+}
+
 type viewerResult struct {
-	Viewer struct {
-		Login string `json:"login"`
-	} `json:"viewer"`
+	Viewer viewer `json:"viewer"`
 }
 
 func generateViewerLogin() string {
 	return `query viewer {
 		viewer {
+			id
 			login
 		}
 	 }`
