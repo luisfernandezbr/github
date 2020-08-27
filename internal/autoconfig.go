@@ -9,6 +9,9 @@ import (
 // AutoConfigure is called when a cloud integration has requested to be auto configured
 func (g *GithubIntegration) AutoConfigure(autoconfig sdk.AutoConfigure) (*sdk.Config, error) {
 	config := autoconfig.Config()
+	if config.Scope != nil && *config.Scope == sdk.OrgScope {
+		return &config, nil // default is everything
+	}
 	logger := g.logger
 	_, client, err := g.newGraphClient(logger, config)
 	if err != nil {
