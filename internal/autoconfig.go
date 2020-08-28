@@ -22,7 +22,7 @@ func (g *GithubIntegration) AutoConfigure(autoconfig sdk.AutoConfigure) (*sdk.Co
 		accounts := make(sdk.ConfigAccounts)
 		for _, org := range orgs {
 			accounts[org.Name] = &sdk.ConfigAccount{
-				ID:     org.Name,
+				ID:     org.Login,
 				Type:   sdk.ConfigAccountTypeOrg,
 				Public: false,
 			}
