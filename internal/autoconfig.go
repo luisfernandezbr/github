@@ -14,32 +14,19 @@ func (g *GithubIntegration) AutoConfigure(autoconfig sdk.AutoConfigure) (*sdk.Co
 	if err != nil {
 		return nil, fmt.Errorf("error creating graphql client: %w", err)
 	}
+	var accounts []*sdk.ConfigAccount
 	if config.Scope != nil && *config.Scope == sdk.OrgScope {
-		orgs, err := g.fetchOrgs(logger, client, autoconfig)
+		accounts, err = g.fetchOrgAccounts(logger, client, autoconfig)
 		if err != nil {
-			return nil, fmt.Errorf("error fetching orgs: %w", err)
+			return nil, err
 		}
-		accounts := make(sdk.ConfigAccounts)
-		for _, org := range orgs {
-			accounts[org.Name] = &sdk.ConfigAccount{
-				ID:     org.Login,
-				Type:   sdk.ConfigAccountTypeOrg,
-				Public: false,
-			}
+	} else {
+		account, err := g.fetchViewerAccount(logger, client, autoconfig)
+		if err != nil {
+			return nil, err
 		}
-		config.Accounts = &accounts
-		return &config, nil // default is everything
+		accounts = []*sdk.ConfigAccount{account}
 	}
-	viewer, err := g.fetchViewer(logger, client, autoconfig)
-	if err != nil {
-		return nil, err
-	}
-	var acct sdk.ConfigAccount
-	acct.ID = viewer
-	acct.Public = false
-	acct.Type = sdk.ConfigAccountTypeUser
-	accounts := make(sdk.ConfigAccounts)
-	accounts[acct.ID] = &acct
-	config.Accounts = &accounts
+	config.Accounts = toConfigAccounts(accounts)
 	return &config, nil
 }
