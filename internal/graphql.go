@@ -334,11 +334,16 @@ type allOrgsResult struct {
 }
 
 type org struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Login    string `json:"login"`
-	IsMember bool   `json:"viewerIsAMember"`
-	IsAdmin  bool   `json:"viewerCanAdminister"`
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	Login        string `json:"login"`
+	AvatarURL    string `json:"avatarUrl"`
+	Description  string `json:"description"`
+	IsMember     bool   `json:"viewerIsAMember"`
+	IsAdmin      bool   `json:"viewerCanAdminister"`
+	Repositories struct {
+		TotalCount int64 `json:"totalCount"`
+	} `json:"repositories"`
 }
 
 type organizations struct {
@@ -417,8 +422,13 @@ query GetAllOrgs($first: Int!) {
 				id
 				name
 				login
+				description
 				viewerIsAMember
 				viewerCanAdminister
+				avatarUrl
+				repositories(isFork:false) {
+					totalCount
+				}
 			}
 		}
 	}
@@ -426,22 +436,32 @@ query GetAllOrgs($first: Int!) {
 `
 
 type viewer struct {
-	ID    string `json:"id"`
-	Login string `json:"login"`
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	Login        string `json:"login"`
+	Description  string `json:"description"`
+	AvatarURL    string `json:"avatarUrl"`
+	Repositories struct {
+		TotalCount int64 `json:"totalCount"`
+	} `json:"repositories"`
 }
 
 type viewerResult struct {
 	Viewer viewer `json:"viewer"`
 }
 
-func generateViewerLogin() string {
-	return `query viewer {
-		viewer {
-			id
-			login
-		}
-	 }`
-}
+const viewerQuery = `query viewer {
+  viewer {
+    id
+    name
+    login
+    description: bio
+    avatarUrl
+    repositories(isFork: false) {
+      totalCount
+    }
+  }
+}`
 
 type repoName struct {
 	ID                 string                `json:"id"`

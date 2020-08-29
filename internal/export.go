@@ -402,12 +402,12 @@ func (g *GithubIntegration) fetchAllRepos(logger sdk.Logger, client sdk.GraphQLC
 	return repos, nil
 }
 
-func (g *GithubIntegration) fetchViewer(logger sdk.Logger, client sdk.GraphQLClient, export sdk.Control) (string, error) {
+func (g *GithubIntegration) fetchViewer(logger sdk.Logger, client sdk.GraphQLClient, export sdk.Control) (*viewer, error) {
 	var retryCount int
 	for {
 		sdk.LogDebug(logger, "running viewer query", "retryCount", retryCount)
 		var result viewerResult
-		if err := client.Query(generateViewerLogin(), nil, &result); err != nil {
+		if err := client.Query(viewerQuery, nil, &result); err != nil {
 			if g.checkForAbuseDetection(logger, export, err) {
 				continue
 			}
@@ -415,10 +415,10 @@ func (g *GithubIntegration) fetchViewer(logger sdk.Logger, client sdk.GraphQLCli
 				retryCount++
 				continue
 			}
-			return "", err
+			return nil, err
 		}
 		retryCount = 0
-		return result.Viewer.Login, nil
+		return &result.Viewer, nil
 	}
 }
 
@@ -894,7 +894,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 		if err != nil {
 			return err
 		}
-		users = append(users, viewer)
+		users = append(users, viewer.Login)
 	} else {
 		for _, acct := range *config.Accounts {
 			if acct.Type == sdk.ConfigAccountTypeOrg {

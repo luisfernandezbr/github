@@ -14,9 +14,13 @@ func (g *GithubIntegration) fetchOrgAccounts(logger sdk.Logger, client sdk.Graph
 	var accounts []*sdk.ConfigAccount
 	for _, org := range orgs {
 		accounts = append(accounts, &sdk.ConfigAccount{
-			ID:     org.Login,
-			Type:   sdk.ConfigAccountTypeOrg,
-			Public: false,
+			ID:          org.Login,
+			Type:        sdk.ConfigAccountTypeOrg,
+			Public:      false,
+			Name:        &org.Name,
+			Description: &org.Description,
+			AvatarURL:   &org.AvatarURL,
+			TotalCount:  &org.Repositories.TotalCount,
 		})
 	}
 	return accounts, nil
@@ -27,11 +31,15 @@ func (g *GithubIntegration) fetchViewerAccount(logger sdk.Logger, client sdk.Gra
 	if err != nil {
 		return nil, err
 	}
-	var acct sdk.ConfigAccount
-	acct.ID = viewer
-	acct.Public = false
-	acct.Type = sdk.ConfigAccountTypeUser
-	return &acct, nil
+	return &sdk.ConfigAccount{
+		ID:          viewer.Login,
+		Public:      false,
+		Type:        sdk.ConfigAccountTypeUser,
+		Name:        &viewer.Name,
+		Description: &viewer.Description,
+		AvatarURL:   &viewer.AvatarURL,
+		TotalCount:  &viewer.Repositories.TotalCount,
+	}, nil
 }
 
 func toConfigAccounts(accounts []*sdk.ConfigAccount) *sdk.ConfigAccounts {
