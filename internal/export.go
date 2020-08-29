@@ -181,6 +181,15 @@ func (g *GithubIntegration) queuePullRequestJob(logger sdk.Logger, client sdk.Gr
 						return err
 					}
 				}
+				for _, reviewreqedge := range predge.Node.ReviewRequests.Edges {
+					prreviewrequest, err := reviewreqedge.Node.ToModel(logger, userManager, customerID, repoID, pullrequest.ID)
+					if err != nil {
+						return err
+					}
+					if err := pipe.Write(prreviewrequest); err != nil {
+						return err
+					}
+				}
 				commits := make([]*sdk.SourceCodePullRequestCommit, 0)
 				for _, commitedge := range predge.Node.Commits.Edges {
 					prcommit, err := commitedge.Node.Commit.ToModel(logger, userManager, customerID, repoID, pullrequest.ID)
@@ -393,12 +402,12 @@ func (g *GithubIntegration) fetchAllRepos(logger sdk.Logger, client sdk.GraphQLC
 	return repos, nil
 }
 
-func (g *GithubIntegration) fetchViewer(logger sdk.Logger, client sdk.GraphQLClient, export sdk.Export) (string, error) {
+func (g *GithubIntegration) fetchViewer(logger sdk.Logger, client sdk.GraphQLClient, export sdk.Control) (*viewer, error) {
 	var retryCount int
 	for {
 		sdk.LogDebug(logger, "running viewer query", "retryCount", retryCount)
 		var result viewerResult
-		if err := client.Query(generateViewerLogin(), nil, &result); err != nil {
+		if err := client.Query(viewerQuery, nil, &result); err != nil {
 			if g.checkForAbuseDetection(logger, export, err) {
 				continue
 			}
@@ -406,11 +415,34 @@ func (g *GithubIntegration) fetchViewer(logger sdk.Logger, client sdk.GraphQLCli
 				retryCount++
 				continue
 			}
-			return "", err
+			return nil, err
 		}
 		retryCount = 0
-		return result.Viewer.Login, nil
+		return &result.Viewer, nil
 	}
+}
+
+// fetchOrgs will fetch all orgs this user is a member of
+func (g *GithubIntegration) fetchOrgs(logger sdk.Logger, client sdk.GraphQLClient, export sdk.Control) ([]org, error) {
+	var allorgs allOrgsResult
+	var orgs []org
+	for {
+		if err := client.Query(allOrgsQuery, map[string]interface{}{"first": 100}, &allorgs); err != nil {
+			if g.checkForAbuseDetection(logger, export, err) {
+				continue
+			}
+			return nil, err
+		}
+		for _, node := range allorgs.Viewer.Organizations.Nodes {
+			if node.IsMember {
+				orgs = append(orgs, node)
+			} else {
+				sdk.LogInfo(logger, "skipping "+node.Login+" the authorized user is not a member of this org")
+			}
+		}
+		break
+	}
+	return orgs, nil
 }
 
 func (g *GithubIntegration) fetchAllRepoMilestones(logger sdk.Logger, client sdk.GraphQLClient, userManager *UserManager, export sdk.Export, repoName, repoRefID string, historical bool) error {
@@ -743,7 +775,7 @@ func (g *GithubIntegration) newGraphClient(logger sdk.Logger, config sdk.Config)
 		sdk.LogInfo(logger, "using apikey authorization")
 	} else if config.OAuth2Auth != nil {
 		authToken := config.OAuth2Auth.AccessToken
-		if config.OAuth2Auth.RefreshToken != nil {
+		if config.OAuth2Auth.RefreshToken != nil && *config.OAuth2Auth.RefreshToken != "" {
 			token, err := g.manager.AuthManager().RefreshOAuth2Token(refType, *config.OAuth2Auth.RefreshToken)
 			if err != nil {
 				return "", nil, fmt.Errorf("error refreshing oauth2 access token: %w", err)
@@ -793,7 +825,7 @@ func (g *GithubIntegration) newHTTPClient(logger sdk.Logger, config sdk.Config) 
 		sdk.LogInfo(logger, "using apikey authorization", "url", url)
 	} else if config.OAuth2Auth != nil {
 		authToken := config.OAuth2Auth.AccessToken
-		if config.OAuth2Auth.RefreshToken != nil {
+		if config.OAuth2Auth.RefreshToken != nil && *config.OAuth2Auth.RefreshToken != "" {
 			token, err := g.manager.AuthManager().RefreshOAuth2Token(refType, *config.OAuth2Auth.RefreshToken)
 			if err != nil {
 				return "", nil, fmt.Errorf("error refreshing oauth2 access token: %w", err)
@@ -851,28 +883,18 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 	var users []string
 	if config.Accounts == nil {
 		// first we're going to fetch all the organizations that the viewer is a member of if accounts if nil
-		var allorgs allOrgsResult
-		for {
-			if err := client.Query(allOrgsQuery, map[string]interface{}{"first": 100}, &allorgs); err != nil {
-				if g.checkForAbuseDetection(logger, export, err) {
-					continue
-				}
-				return err
-			}
-			for _, node := range allorgs.Viewer.Organizations.Nodes {
-				if node.IsMember {
-					orgs = append(orgs, node.Login)
-				} else {
-					sdk.LogInfo(logger, "skipping "+node.Login+" the authorized user is not a member of this org")
-				}
-			}
-			break
+		fullorgs, err := g.fetchOrgs(logger, client, export)
+		if err != nil {
+			return fmt.Errorf("error fetching orgs: %w", err)
+		}
+		for _, org := range fullorgs {
+			orgs = append(orgs, org.Name)
 		}
 		viewer, err := g.fetchViewer(logger, client, export)
 		if err != nil {
 			return err
 		}
-		users = append(users, viewer)
+		users = append(users, viewer.Login)
 	} else {
 		for _, acct := range *config.Accounts {
 			if acct.Type == sdk.ConfigAccountTypeOrg {
@@ -952,7 +974,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 	userManager := NewUserManager(customerID, orgs, export, state, pipe, g, instanceID, export.Historical())
 	jobs := make([]job, 0)
 	started := time.Now()
-	var repoCount, prCount, reviewCount, commitCount, commentCount int
+	var repoCount, prCount, reviewCount, reviewRequestCount, commitCount, commentCount int
 	var hasPreviousRepos bool
 	previousRepos := make(map[string]*sdk.SourceCodeRepo)
 	previousProjects := make(map[string]*sdk.WorkProject)
@@ -1082,6 +1104,19 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 			if predge.Node.Reviews.PageInfo.HasNextPage {
 				jobs = append(jobs, g.queuePullRequestReviewsJob(logger, client, userManager, r.Name, repo.GetID(), pullrequest.ID, predge.Node.Number, predge.Node.Reviews.PageInfo.EndCursor))
 			}
+			for _, reviewRequestedge := range predge.Node.ReviewRequests.Edges {
+				prreview, err := reviewRequestedge.Node.ToModel(logger, userManager, customerID, repo.ID, pullrequest.ID)
+				if err != nil {
+					return err
+				}
+				if err := pipe.Write(prreview); err != nil {
+					return fmt.Errorf("error writing review request for pull request %s for repo: %v. %w", pullrequest.ID, r.Name, err)
+				}
+				reviewRequestCount++
+			}
+			if predge.Node.ReviewRequests.PageInfo.HasNextPage {
+				// TODO(robin): queue job if has nextpage, for prs with >10 reviewers requested
+			}
 			for _, commentedge := range predge.Node.Comments.Edges {
 				prcomment, err := commentedge.Node.ToModel(logger, userManager, customerID, repo.ID, pullrequest.ID)
 				if err != nil {
@@ -1164,7 +1199,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 	}
 	sdk.LogDebug(logger, "saved previous state", "repos", len(previousRepos), "projects", len(previousProjects))
 
-	sdk.LogInfo(logger, "initial export completed", "duration", time.Since(started), "repoCount", repoCount, "prCount", prCount, "reviewCount", reviewCount, "commitCount", commitCount, "commentCount", commentCount, "jobs", len(jobs))
+	sdk.LogInfo(logger, "initial export completed", "duration", time.Since(started), "repoCount", repoCount, "prCount", prCount, "reviewCount", reviewCount, "reviewRequestCount", reviewRequestCount, "commitCount", commitCount, "commentCount", commentCount, "jobs", len(jobs))
 
 	_, skipHistorical := g.config.GetBool("skip-historical")
 

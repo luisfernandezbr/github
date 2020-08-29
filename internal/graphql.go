@@ -153,6 +153,23 @@ var pullrequestFields = `
 			}
 		}
 	}
+	reviewRequests (first: 10) {
+		edges {
+			cursor
+			node {
+				id
+				requestedReviewer {
+					...on User {
+						login
+						id
+						email
+						name
+						type: __typename
+					}
+				}
+			}
+		}
+	}
 	comments(first: 10) {
 		totalCount
 		pageInfo {
@@ -317,10 +334,16 @@ type allOrgsResult struct {
 }
 
 type org struct {
-	Name     string `json:"name"`
-	Login    string `json:"login"`
-	IsMember bool   `json:"viewerIsAMember"`
-	IsAdmin  bool   `json:"viewerCanAdminister"`
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	Login        string `json:"login"`
+	AvatarURL    string `json:"avatarUrl"`
+	Description  string `json:"description"`
+	IsMember     bool   `json:"viewerIsAMember"`
+	IsAdmin      bool   `json:"viewerCanAdminister"`
+	Repositories struct {
+		TotalCount int64 `json:"totalCount"`
+	} `json:"repositories"`
 }
 
 type organizations struct {
@@ -396,29 +419,49 @@ query GetAllOrgs($first: Int!) {
 	viewer {
 		organizations(first: $first) {
 			nodes {
+				id
 				name
 				login
+				description
 				viewerIsAMember
 				viewerCanAdminister
+				avatarUrl
+				repositories(isFork:false) {
+					totalCount
+				}
 			}
 		}
 	}
 }
 `
 
-type viewerResult struct {
-	Viewer struct {
-		Login string `json:"login"`
-	} `json:"viewer"`
+type viewer struct {
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	Login        string `json:"login"`
+	Description  string `json:"description"`
+	AvatarURL    string `json:"avatarUrl"`
+	Repositories struct {
+		TotalCount int64 `json:"totalCount"`
+	} `json:"repositories"`
 }
 
-func generateViewerLogin() string {
-	return `query viewer {
-		viewer {
-		  login
-		}
-	 }`
+type viewerResult struct {
+	Viewer viewer `json:"viewer"`
 }
+
+const viewerQuery = `query viewer {
+  viewer {
+    id
+    name
+    login
+    description: bio
+    avatarUrl
+    repositories(isFork: false) {
+      totalCount
+    }
+  }
+}`
 
 type repoName struct {
 	ID                 string                `json:"id"`
@@ -551,10 +594,10 @@ func getAllRepoDataQuery(owner, name, label, cursor string) string {
 		}
 		labels(first: 20, orderBy:{field:CREATED_AT, direction:ASC}) {
 			nodes {
-			  id
-			  name
-			  color
-			  description
+				id
+				name
+				color
+				description
 			}
 		}
 		pullRequests(first: 10, orderBy: {field: UPDATED_AT, direction: DESC}, states:[OPEN, MERGED, CLOSED] %s) {
@@ -670,7 +713,7 @@ func getAllRepoDataQuery(owner, name, label, cursor string) string {
 							endCursor
 						}
 						edges {
-						cursor
+							cursor
 							node {
 								id
 								state
@@ -683,6 +726,30 @@ func getAllRepoDataQuery(owner, name, label, cursor string) string {
 									url
 									... on User {
 										id
+										email
+										name
+									}
+								}
+							}
+						}
+					}
+					reviewRequests (first: 10) {
+						totalCount
+						pageInfo {
+							hasNextPage
+							startCursor
+							endCursor
+						}
+						edges {
+							cursor
+							node {
+								id
+								databaseId
+								requestedReviewer {
+									...on User {
+										type: __typename
+										id
+										login
 										email
 										name
 									}
@@ -739,7 +806,7 @@ query getIssues($name: String!, $owner: String!, $before: String, $after: String
 		resetAt
 	}
 	repository(name: $name, owner: $owner) {
-	  issues(first: 100, before: $before, after: $after, orderBy: {field: UPDATED_AT, direction: DESC}, states: [OPEN, CLOSED]) {
+		issues(first: 100, before: $before, after: $after, orderBy: {field: UPDATED_AT, direction: DESC}, states: [OPEN, CLOSED]) {
 		totalCount
 		pageInfo {
 			hasNextPage
@@ -763,27 +830,27 @@ query getIssues($name: String!, $owner: String!, $before: String, $after: String
 			}
 			labels(first: 20, orderBy: {field: CREATED_AT, direction: ASC}) {
 				nodes {
-				  id
-				  name
-				  color
-				  description
+					id
+					name
+					color
+					description
 				}
 			}
 			comments(last: 100) {
 				totalCount
 				pageInfo {
-				  startCursor
-				  endCursor
-				  hasNextPage
-				  hasPreviousPage
+					startCursor
+					endCursor
+					hasNextPage
+					hasPreviousPage
 				}
 				nodes {
-				  id
-				  url
-				  body
-				  createdAt
-				  updatedAt
-				  author {
+					id
+					url
+					body
+					createdAt
+					updatedAt
+					author {
 					 type: __typename
 					 avatarUrl
 					 login
@@ -793,15 +860,15 @@ query getIssues($name: String!, $owner: String!, $before: String, $after: String
 						email
 						name
 					 }
-				  }
+					}
 				}
 			}
 			assignees(last: 1) {
-			  nodes {
+				nodes {
 				 id
 				 login
 				 avatarUrl
-			  }
+				}
 			}
 			author {
 				type: __typename
@@ -815,7 +882,7 @@ query getIssues($name: String!, $owner: String!, $before: String, $after: String
 				}
 			}
 		 }
-	  }
+		}
 	}
  }
 `
@@ -904,9 +971,9 @@ query getMilestones($name: String!, $owner: String!, $before: String, $after: St
 var pullrequestNodeIDQuery = `
 query getPRNodeID($name: String!, $owner: String!, $number: Int!) { 
 	repository(name: $name owner: $owner){
-	  pullRequest(number:$number) {
+		pullRequest(number:$number) {
 		 id
-	  }
+		}
 	}
 }`
 
