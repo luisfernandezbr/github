@@ -10,6 +10,7 @@ import {
 	Form,
 	FormType,
 	IAppBasicAuth,
+	ConfigAccount,
 } from '@pinpt/agent.websdk';
 import styles from './styles.module.less';
 
@@ -38,72 +39,34 @@ const viewerOrgsGQL = `{
 	}
 }`;
 
-const githubUserToAccount = (data: any, isPublic: boolean): Account => {
+
+const toAccount = (data: ConfigAccount): Account => {
 	return {
-		id: data.login,
-		name: data.name,
-		description: data.bio || data.description,
-		avatarUrl: data.avatarUrl || data.avatar_url,
-		totalCount: data.public_repos || data.repositories?.totalCount || 0,
-		type: 'USER',
-		public: isPublic,
+		id: data.id,
+		public: data.public,
+		type: data.type,
+		avatarUrl: data.avatarUrl,
+		name: data.name || '',
+		description: data.description || '',
+		totalCount: data.totalCount || 0,
 	}
 };
 
-const githubOrgToAccount = (data: any, isPublic: boolean): Account => {
-	return {
-		id: data.login,
-		name: data.name,
-		description: data.description,
-		avatarUrl: data.avatarUrl || data.avatar_url,
-		totalCount: data.public_repos || data.repositories?.totalCount || 0,
-		type: 'ORG',
-		public: isPublic,
-	};
-};
 
-const fetchViewerOrgsOAuth = async(api_key: string) => {
-	const [data] = await Graphql.query('https://api.github.com/graphql', viewerOrgsGQL, undefined, {Authorization: `Bearer ${api_key}`}, false);
-	return data;
-};
-
-const fetchViewerOrgsBasic = async(auth: IAppBasicAuth) => {
-	const enc = btoa(auth.username + ":" + auth.password);
-	const [data] = await Graphql.query(auth.url!, viewerOrgsGQL, undefined, {Authorization: `Basic ${enc}`}, false);
-	return data;
-};
+interface validationResponse {
+	accounts: ConfigAccount[];
+}
 
 const AccountList = () => {
-	const { processingDetail, config, setConfig, installed, setInstallEnabled } = useIntegration();
+	const { processingDetail, config, setConfig, installed, setInstallEnabled, setValidate } = useIntegration();
 	const [accounts, setAccounts] = useState<Account[]>([]);
-
+	console.log('aaaaa', accounts, installed);
 	useEffect(() => {
-		let data: any;
 		const fetch = async () => {
-			if (config.integration_type === IntegrationType.CLOUD) {
-				data = await fetchViewerOrgsOAuth(config.oauth2_auth?.access_token!);
-			} else {
-				data = await fetchViewerOrgsBasic(config.basic_auth!);
-			}
-			const orgs = config.accounts || {};
-			config.accounts = orgs;
-			const newaccounts = data.viewer.organizations.nodes.map((org: any) => githubOrgToAccount(org, false));
-			newaccounts.unshift(githubUserToAccount(data.viewer, false));
-
-			if (!installed) {
-				newaccounts.forEach((account: Account) => (orgs[account.id] = account));
-			}
-
-			Object.keys(orgs).forEach((id: string) => {
-				const found = newaccounts.find((acct: Account) => acct.id === id);
-
-				if (!found) {
-					const entry = orgs[id];
-					newaccounts.push(entry);
-				}
-			});
-
-			setAccounts(newaccounts);
+			let data: validationResponse;
+			data = await setValidate(config);
+			config.accounts = config.accounts || {};
+			setAccounts(data.accounts.map((acct) => toAccount(acct)));
 			setInstallEnabled(installed ? true : Object.keys(config.accounts).length > 0);
 			setConfig(config);
 		};
@@ -113,13 +76,13 @@ const AccountList = () => {
 	return (processingDetail?.throttled && processingDetail?.throttledUntilDate) ? (
 		<ErrorMessage heading="Your authorization token has been throttled by GitHub." message={`Please try again in ${Math.ceil((processingDetail.throttledUntilDate - Date.now()) / 60000)} minutes.`} />
 	) : (
-		<AccountsTable
-			description="For the selected accounts, all repositories, issues, pull requests and other data will automatically be made available in Pinpoint once installed."
-			accounts={accounts}
-			entity="repo"
-			config={config}
-		/>
-	);
+			<AccountsTable
+				description="For the selected accounts, all repositories, issues, pull requests and other data will automatically be made available in Pinpoint once installed."
+				accounts={accounts}
+				entity="repo"
+				config={config}
+			/>
+		);
 };
 
 const LocationSelector = ({ setType }: { setType: (val: IntegrationType) => void }) => {
@@ -156,7 +119,7 @@ const SelfManagedForm = ({ callback }: any) => {
 				auth.url = u.toString();
 			}
 			const enc = btoa(auth.username + ":" + auth.password);
-			const [data, status] = await Graphql.query(auth.url!, `query { viewer { id } }`, undefined, {Authorization: `Basic ${enc}`});
+			const [data, status] = await Graphql.query(auth.url!, `query { viewer { id } }`, undefined, { Authorization: `Basic ${enc}` });
 			if (status !== 200) {
 				throw new Error(data.message ?? 'Invalid Credentials');
 			}
