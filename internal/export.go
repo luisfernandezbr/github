@@ -182,7 +182,7 @@ func (g *GithubIntegration) queuePullRequestJob(logger sdk.Logger, client sdk.Gr
 					}
 				}
 				for _, reviewreqedge := range predge.Node.ReviewRequests.Edges {
-					prreviewrequest, err := reviewreqedge.Node.ToModel(logger, userManager, customerID, repoID, pullrequest.ID)
+					prreviewrequest, err := reviewreqedge.Node.ToModel(logger, userManager, customerID, repoID, pullrequest.ID, predge.Node.UpdatedAt)
 					if err != nil {
 						return err
 					}
@@ -1105,7 +1105,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 				jobs = append(jobs, g.queuePullRequestReviewsJob(logger, client, userManager, r.Name, repo.GetID(), pullrequest.ID, predge.Node.Number, predge.Node.Reviews.PageInfo.EndCursor))
 			}
 			for _, reviewRequestedge := range predge.Node.ReviewRequests.Edges {
-				prreview, err := reviewRequestedge.Node.ToModel(logger, userManager, customerID, repo.ID, pullrequest.ID)
+				prreview, err := reviewRequestedge.Node.ToModel(logger, userManager, customerID, repo.ID, pullrequest.ID, predge.Node.UpdatedAt)
 				if err != nil {
 					return err
 				}
