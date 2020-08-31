@@ -63,7 +63,7 @@ func reviewRequest(customerID string, integrationInstanceID string, repoID strin
 }
 
 func (r pullrequestreviewrequest) ToModel(logger sdk.Logger, userManager *UserManager, customerID string, repoID string, prID string, prUpdatedDate time.Time) (*sdk.SourceCodePullRequestReviewRequest, error) {
-	reviewRequest := reviewRequest(customerID, userManager.instanceid, repoID, prID, r.RequestedReviewer.ID, "", time.Now())
+	reviewRequest := reviewRequest(customerID, userManager.instanceid, repoID, prID, r.RequestedReviewer.ID, "", prUpdatedDate)
 	// TODO(robin): figure out ref_id
 	if err := userManager.emitAuthor(logger, r.RequestedReviewer); err != nil {
 		return nil, err
