@@ -311,7 +311,10 @@ func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 	case *github.ProjectCardEvent:
 		return g.fetchRepoProject(g.logger, client, webhook.Pipe(), webhook, webhook.CustomerID(), webhook.IntegrationInstanceID(), v.Repo.GetFullName(), v.Repo.GetNodeID(), int(v.GetProjectCard().GetProjectID()))
 	case *github.ProjectColumnEvent:
-		num := getProjectIDfromURL(v.ProjectColumn.GetProjectURL())
+		num, err := getProjectIDfromURL(v.ProjectColumn.GetProjectURL())
+		if err != nil {
+			return fmt.Errorf("error getting project id: %w", err)
+		}
 		return g.fetchRepoProject(g.logger, client, webhook.Pipe(), webhook, webhook.CustomerID(), webhook.IntegrationInstanceID(), v.Repo.GetFullName(), v.Repo.GetNodeID(), num)
 	case *github.MilestoneEvent:
 		repoLogin := getRepoOwnerLogin(v.Repo)

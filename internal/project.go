@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -63,11 +64,20 @@ type repoProjectResult struct {
 	} `json:"repository"`
 }
 
-func getProjectIDfromURL(url string) int {
+func getProjectIDfromURL(url string) (int, error) {
 	i := strings.LastIndex(url, "/")
-	val := url[i:1]
-	num, _ := strconv.ParseInt(val, 10, 32)
-	return int(num)
+	if i < 0 {
+		return 0, fmt.Errorf("invalid project url: %s", url)
+	}
+	if i == len(url)-1 {
+		return 0, fmt.Errorf("url was missing project id at end: %s", url)
+	}
+	val := url[i+1:]
+	num, err := strconv.ParseInt(val, 10, 32)
+	if err != nil {
+		return 0, err
+	}
+	return int(num), nil
 }
 
 func (p repoProject) ToModel(logger sdk.Logger, customerID string, integrationInstanceID string, projectID string) (*sdk.AgileBoard, *sdk.AgileKanban) {
