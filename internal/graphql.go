@@ -567,6 +567,48 @@ query getProjects($name: String!, $owner: String!) {
 	}
 }`
 
+var repoProjectQuery = `
+query getProject($name: String!, $owner: String!, $num: Int!) {
+	rateLimit {
+		limit
+		cost
+		remaining
+		resetAt
+	}
+	repository(name: $name, owner: $owner) {
+		project(number: $num) {
+			name
+			id
+			url
+			updatedAt
+			columns(first: 100) {
+				nodes {
+					id
+					name
+					purpose
+					cards(first: 100, archivedStates: NOT_ARCHIVED) {
+						nodes {
+						id
+						__typename
+						state
+						note
+						content {
+							__typename
+							... on Issue {
+								id
+							}
+							... on PullRequest {
+								id
+							}
+						}
+						}
+					}
+				}
+			}
+		}
+	}
+}`
+
 func getAllRepoDataQuery(owner, name, label, cursor string) string {
 	var cursorVal string
 	if cursor != "" {

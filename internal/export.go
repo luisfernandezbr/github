@@ -596,7 +596,7 @@ func (g *GithubIntegration) fetchRepoProject(logger sdk.Logger, client sdk.Graph
 	for {
 		sdk.LogDebug(logger, "running repo project query", "retryCount", retryCount, "num", num, "name", repoName)
 		var result repoProjectResult
-		if err := client.Query(repoProjectsQuery, variables, &result); err != nil {
+		if err := client.Query(repoProjectQuery, variables, &result); err != nil {
 			if g.checkForAbuseDetection(logger, control, err) {
 				continue
 			}
@@ -606,6 +606,7 @@ func (g *GithubIntegration) fetchRepoProject(logger sdk.Logger, client sdk.Graph
 			}
 			return err
 		}
+		fmt.Println(result)
 		projectID := sdk.NewWorkProjectID(customerID, repoRefID, refType)
 		b, p := result.Repository.Project.ToModel(logger, customerID, integrationInstanceID, projectID)
 		if b != nil {
@@ -888,7 +889,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 			return fmt.Errorf("error fetching orgs: %w", err)
 		}
 		for _, org := range fullorgs {
-			orgs = append(orgs, org.Name)
+			orgs = append(orgs, org.Login)
 		}
 		viewer, err := g.fetchViewer(logger, client, export)
 		if err != nil {
