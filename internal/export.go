@@ -606,7 +606,6 @@ func (g *GithubIntegration) fetchRepoProject(logger sdk.Logger, client sdk.Graph
 			}
 			return err
 		}
-		fmt.Println(result)
 		projectID := sdk.NewWorkProjectID(customerID, repoRefID, refType)
 		b, p := result.Repository.Project.ToModel(logger, customerID, integrationInstanceID, projectID)
 		if b != nil {
