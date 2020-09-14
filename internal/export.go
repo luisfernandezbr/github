@@ -897,6 +897,9 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 		users = append(users, viewer.Login)
 	} else {
 		for _, acct := range *config.Accounts {
+			if acct.Selected != nil && !*acct.Selected {
+				continue
+			}
 			if acct.Type == sdk.ConfigAccountTypeOrg {
 				orgs = append(orgs, acct.ID)
 			} else {
