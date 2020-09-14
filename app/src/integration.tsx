@@ -61,7 +61,6 @@ interface validationResponse {
 const AccountList = () => {
 	const { processingDetail, config, setConfig, installed, setInstallEnabled, setValidate } = useIntegration();
 	const [accounts, setAccounts] = useState<Account[]>([]);
-	console.log('aaaaa2', accounts, installed);
 	useEffect(() => {
 		const fetch = async () => {
 			let data: validationResponse;
