@@ -21,6 +21,7 @@ func (g *GithubIntegration) fetchOrgAccounts(logger sdk.Logger, client sdk.Graph
 			Description: &org.Description,
 			AvatarURL:   &org.AvatarURL,
 			TotalCount:  &org.Repositories.TotalCount,
+			Selected:    sdk.BoolPointer(true),
 		})
 	}
 	return accounts, nil
@@ -39,6 +40,7 @@ func (g *GithubIntegration) fetchViewerAccount(logger sdk.Logger, client sdk.Gra
 		Description: &viewer.Description,
 		AvatarURL:   &viewer.AvatarURL,
 		TotalCount:  &viewer.Repositories.TotalCount,
+		Selected:    sdk.BoolPointer(true),
 	}, nil
 }
 

@@ -49,6 +49,7 @@ const toAccount = (data: ConfigAccount): Account => {
 		name: data.name || '',
 		description: data.description || '',
 		totalCount: data.totalCount || 0,
+		selected: !!data.selected
 	}
 };
 
@@ -60,12 +61,18 @@ interface validationResponse {
 const AccountList = () => {
 	const { processingDetail, config, setConfig, installed, setInstallEnabled, setValidate } = useIntegration();
 	const [accounts, setAccounts] = useState<Account[]>([]);
-	console.log('aaaaa', accounts, installed);
+	console.log('aaaaa2', accounts, installed);
 	useEffect(() => {
 		const fetch = async () => {
 			let data: validationResponse;
 			data = await setValidate(config);
 			config.accounts = config.accounts || {};
+			var accounts = data.accounts as Account[];
+			accounts.forEach(( account ) => {
+				if ( config  && config.accounts){
+					config.accounts[account.id] = account;
+				}
+			});
 			setAccounts(data.accounts.map((acct) => toAccount(acct)));
 			setInstallEnabled(installed ? true : Object.keys(config.accounts).length > 0);
 			setConfig(config);

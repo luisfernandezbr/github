@@ -42,6 +42,9 @@ func (g *GithubIntegration) Enroll(instance sdk.Instance) error {
 			return fmt.Errorf("error creating http client: %w", err)
 		}
 		for login, acct := range *config.Accounts {
+			if acct.Selected != nil && !*acct.Selected {
+				continue
+			}
 			if acct.Type == sdk.ConfigAccountTypeOrg {
 				if err := g.registerOrgWebhook(g.manager.WebHookManager(), client, instance.CustomerID(), instance.IntegrationInstanceID(), login); err != nil {
 					g.manager.WebHookManager().Errored(instance.CustomerID(), instance.IntegrationInstanceID(), refType, login, sdk.WebHookScopeOrg, err)
