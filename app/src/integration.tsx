@@ -69,6 +69,10 @@ const AccountList = () => {
 			var accounts = data.accounts as Account[];
 			accounts.forEach(( account ) => {
 				if ( config  && config.accounts){
+					const selected = config.accounts[account.id]?.selected
+					if (installed) {	
+						account.selected = !!selected
+					}
 					config.accounts[account.id] = account;
 				}
 			});
