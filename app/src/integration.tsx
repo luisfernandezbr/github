@@ -61,16 +61,25 @@ interface validationResponse {
 const AccountList = () => {
 	const { processingDetail, config, setConfig, installed, setInstallEnabled, setValidate } = useIntegration();
 	const [accounts, setAccounts] = useState<Account[]>([]);
+	const [loading, setLoading] = useState(true);
+	const [error, setError] = useState<string>();
+
 	useEffect(() => {
 		const fetch = async () => {
 			let data: validationResponse;
-			data = await setValidate(config);
+			try {
+				data = await setValidate(config);
+			} catch (ex) {
+				setError(ex);
+				setLoading(false);
+				return
+			}
 			config.accounts = config.accounts || {};
 			var accounts = data.accounts as Account[];
-			accounts.forEach(( account ) => {
-				if ( config  && config.accounts){
+			accounts.forEach((account) => {
+				if (config && config.accounts) {
 					const selected = config.accounts[account.id]?.selected
-					if (installed) {	
+					if (installed) {
 						account.selected = !!selected
 					}
 					config.accounts[account.id] = account;
@@ -79,10 +88,21 @@ const AccountList = () => {
 			setAccounts(data.accounts.map((acct) => toAccount(acct)));
 			setInstallEnabled(installed ? true : Object.keys(config.accounts).length > 0);
 			setConfig(config);
+			setLoading(false);
 		};
 		fetch();
-	}, [installed, setInstallEnabled, config, setConfig]);
+	}, []);
 
+	if (loading) {
+		return (
+			<Loader centered />
+		);
+	}
+	if (error) {
+		return (
+			<ErrorMessage heading="Error from integration." message={error} />
+		)
+	}
 	return (processingDetail?.throttled && processingDetail?.throttledUntilDate) ? (
 		<ErrorMessage heading="Your authorization token has been throttled by GitHub." message={`Please try again in ${Math.ceil((processingDetail.throttledUntilDate - Date.now()) / 60000)} minutes.`} />
 	) : (

@@ -296,7 +296,7 @@ func (c comment) ToModel(logger sdk.Logger, userManager *UserManager, customerID
 	comment.URL = c.URL
 	sdk.ConvertTimeToDateModel(c.CreatedAt, &comment.CreatedDate)
 	sdk.ConvertTimeToDateModel(c.UpdatedAt, &comment.UpdatedDate)
-	comment.ID = sdk.NewWorkIssueCommentID(customerID, c.ID, refType, projectID)
+	comment.ID = sdk.NewWorkIssueCommentID(customerID, c.ID, refType)
 	comment.UserRefID = c.Author.RefID(customerID)
 	err := userManager.emitAuthor(logger, c.Author)
 	return &comment, err
