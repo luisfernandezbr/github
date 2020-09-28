@@ -211,7 +211,7 @@ func (g *GithubIntegration) updatePullrequest(logger sdk.Logger, config sdk.Conf
 		return fmt.Errorf("error creating http client: %w", err)
 	}
 	var resp mutationResponse
-	sdk.LogDebug(logger, "sending pull request mutation", "input", payload, "user", user.ID)
+	sdk.LogDebug(logger, "sending pull request mutation", "input", payload, "user", user.RefID)
 	if err := client.Query(pullRequestUpdateMutation, map[string]interface{}{"input": payload}, &resp); err != nil {
 		return err
 	}
