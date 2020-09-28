@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pinpt/agent/sdk"
+	"github.com/pinpt/agent/v4/sdk"
 )
 
 // In GitHub:

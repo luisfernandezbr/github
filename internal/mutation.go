@@ -1,6 +1,6 @@
 package internal
 
-import "github.com/pinpt/agent/sdk"
+import "github.com/pinpt/agent/v4/sdk"
 
 // Mutation is called when a mutation request is received on behalf of the integration
 func (g *GithubIntegration) Mutation(mutation sdk.Mutation) error {
