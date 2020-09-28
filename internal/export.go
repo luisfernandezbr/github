@@ -423,9 +423,9 @@ func (g *GithubIntegration) fetchViewer(logger sdk.Logger, client sdk.GraphQLCli
 }
 
 // fetchOrgs will fetch all orgs this user is a member of
-func (g *GithubIntegration) fetchOrgs(logger sdk.Logger, client sdk.GraphQLClient, export sdk.Control) ([]org, error) {
+func (g *GithubIntegration) fetchOrgs(logger sdk.Logger, client sdk.GraphQLClient, export sdk.Control) ([]*org, error) {
 	var allorgs allOrgsResult
-	var orgs []org
+	var orgs []*org
 	for {
 		if err := client.Query(allOrgsQuery, map[string]interface{}{"first": 100}, &allorgs); err != nil {
 			if g.checkForAbuseDetection(logger, export, err) {
