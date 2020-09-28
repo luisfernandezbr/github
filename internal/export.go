@@ -11,7 +11,7 @@ import (
 	"time"
 
 	easyjson "github.com/mailru/easyjson"
-	"github.com/pinpt/agent.next/sdk"
+	"github.com/pinpt/agent/sdk"
 )
 
 const (

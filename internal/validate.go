@@ -3,7 +3,7 @@ package internal
 import (
 	"fmt"
 
-	"github.com/pinpt/agent.next/sdk"
+	"github.com/pinpt/agent/sdk"
 )
 
 func (g *GithubIntegration) fetchOrgAccounts(logger sdk.Logger, client sdk.GraphQLClient, control sdk.Control) ([]*sdk.ConfigAccount, error) {

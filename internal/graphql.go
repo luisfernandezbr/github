@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pinpt/agent.next/sdk"
+	"github.com/pinpt/agent/sdk"
 )
 
 const refType = "github"

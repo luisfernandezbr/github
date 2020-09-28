@@ -1,5 +1,5 @@
 {
-  "name": "@pinpt/agent.next.github",
+  "name": "@pinpt/github",
   "version": "1.0.0",
   "private": true,
   "dependencies": {

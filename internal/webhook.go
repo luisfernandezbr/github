@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/google/go-github/v32/github"
-	"github.com/pinpt/agent.next/sdk"
+	"github.com/pinpt/agent/sdk"
 )
 
 type webhookResponse struct {
