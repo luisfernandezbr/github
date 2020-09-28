@@ -3,7 +3,7 @@ package internal
 import (
 	"time"
 
-	"github.com/pinpt/agent/sdk"
+	"github.com/pinpt/agent/v4/sdk"
 )
 
 type pullrequestCommit struct {

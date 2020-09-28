@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pinpt/agent/sdk"
+	"github.com/pinpt/agent/v4/sdk"
 )
 
 // UserManager is a manager for users

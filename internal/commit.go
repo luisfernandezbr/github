@@ -2,7 +2,7 @@ package internal
 
 import (
 	"github.com/google/go-github/v32/github"
-	"github.com/pinpt/agent/sdk"
+	"github.com/pinpt/agent/v4/sdk"
 )
 
 func (g *GithubIntegration) fromPushEvent(logger sdk.Logger, client sdk.GraphQLClient, userManager *UserManager, control sdk.Control, customerID string, push *github.PushEvent) ([]*sdk.SourceCodeCommit, error) {

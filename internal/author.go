@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/google/go-github/v32/github"
-	"github.com/pinpt/agent/sdk"
+	"github.com/pinpt/agent/v4/sdk"
 )
 
 func isBot(name string) bool {
