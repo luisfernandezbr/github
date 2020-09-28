@@ -347,7 +347,7 @@ type org struct {
 }
 
 type organizations struct {
-	Nodes []org `json:"nodes"`
+	Nodes []*org `json:"nodes"`
 }
 
 func generateAllPRCommitsQuery(before string, after string) string {
