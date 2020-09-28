@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pinpt/agent.next/sdk"
+	"github.com/pinpt/agent/sdk"
 )
 
 // GithubIntegration is an integration for GitHub

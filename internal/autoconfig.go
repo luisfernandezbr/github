@@ -3,7 +3,7 @@ package internal
 import (
 	"fmt"
 
-	"github.com/pinpt/agent.next/sdk"
+	"github.com/pinpt/agent/sdk"
 )
 
 // AutoConfigure is called when a cloud integration has requested to be auto configured

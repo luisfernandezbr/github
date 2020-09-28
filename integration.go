@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/pinpt/agent.next.github/internal"
-	"github.com/pinpt/agent.next/runner"
+	"github.com/pinpt/github/internal"
+	"github.com/pinpt/agent/runner"
 )
 
 // Integration is used to export the integration
