@@ -7,7 +7,6 @@ require (
 	github.com/mailru/easyjson v0.7.1
 	github.com/pinpt/agent.next v0.0.0-20200911210317-929ce86d78f8
 	github.com/stretchr/testify v1.6.1
-	go.opentelemetry.io/otel v0.8.0 // indirect
 	golang.org/x/net v0.0.0-20200707034311-ab3426394381 // indirect
 )
 
