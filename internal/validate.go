@@ -13,11 +13,12 @@ func (g *GithubIntegration) fetchOrgAccounts(logger sdk.Logger, client sdk.Graph
 	}
 	var accounts []*sdk.ConfigAccount
 	for _, org := range orgs {
+		name := fmt.Sprintf("%s (%s)", org.Name, org.Login)
 		accounts = append(accounts, &sdk.ConfigAccount{
 			ID:          org.Login,
 			Type:        sdk.ConfigAccountTypeOrg,
 			Public:      false,
-			Name:        &org.Name,
+			Name:        &name,
 			Description: &org.Description,
 			AvatarURL:   &org.AvatarURL,
 			TotalCount:  &org.Repositories.TotalCount,
