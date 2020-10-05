@@ -218,7 +218,7 @@ func (i issue) ToModel(logger sdk.Logger, userManager *UserManager, customerID s
 	issue.URL = i.URL
 	issue.Title = i.Title
 	issue.Description = toHTML(i.Body)
-	issue.ProjectID = projectID
+	issue.ProjectID = sdk.StringPointer(projectID)
 	issue.Active = true
 	issue.ID = sdk.NewWorkIssueID(customerID, i.ID, refType)
 	if len(i.Labels.Nodes) > 0 {
