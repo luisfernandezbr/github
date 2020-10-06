@@ -69,7 +69,11 @@ func (g *GithubIntegration) fromPullRequestEvent(logger sdk.Logger, client sdk.G
 		object.Locked = *pr.PullRequest.Locked
 		object.Merged = *pr.PullRequest.Merged
 		object.Number = *pr.PullRequest.Number
-		object.State = strings.ToUpper(*pr.PullRequest.State)
+		state := strings.ToUpper(*pr.PullRequest.State)
+		if object.Merged {
+			state = "MERGED"
+		}
+		object.State = state
 		object.Title = *pr.PullRequest.Title
 		object.CreatedAt = *pr.PullRequest.CreatedAt
 		if pr.PullRequest.UpdatedAt != nil {
