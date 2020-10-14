@@ -205,9 +205,9 @@ var pullrequestFields = `
 `
 
 var pullrequestPagedQuery = fmt.Sprintf(`
-query GetPullRequests($name: String!, $owner: String!, $first: Int!, $after: String) {
+query GetPullRequests($name: String!, $owner: String!, $first: Int!, $after: String, $before: String) {
 	repository(name: $name, owner: $owner) {
-		pullRequests(first: $first, after: $after, orderBy: {field: UPDATED_AT, direction: DESC}, states:[OPEN, MERGED, CLOSED]) {
+		pullRequests(first: $first, after: $after, before: $before, orderBy: {field: UPDATED_AT, direction: DESC}, states:[OPEN, MERGED, CLOSED]) {
 			totalCount
 			pageInfo {
 				hasNextPage
@@ -612,7 +612,7 @@ query getProject($name: String!, $owner: String!, $num: Int!) {
 func getAllRepoDataQuery(owner, name, label, cursor string) string {
 	var cursorVal string
 	if cursor != "" {
-		cursorVal = fmt.Sprintf(`, after: "%s"`, cursor)
+		cursorVal = fmt.Sprintf(`, before: "%s"`, cursor)
 	}
 	return fmt.Sprintf(`
 %s: repository(name: "%s", owner: "%s") {
