@@ -20,6 +20,7 @@ const (
 	defaultPullRequestCommitPageSize = 100
 	previousReposStateKey            = "previous_repos"
 	previousProjectsStateKey         = "previous_projects"
+	forceIncrementalStateKey         = "force_incremental"
 )
 
 type job func(export sdk.Export, pipe sdk.Pipe) error
@@ -128,15 +129,19 @@ func (g *GithubIntegration) fetchPullRequestCommits(logger sdk.Logger, client sd
 	return commits, nil
 }
 
-func (g *GithubIntegration) queuePullRequestJob(logger sdk.Logger, client sdk.GraphQLClient, userManager *UserManager, repoName string, repoID string, cursor string) job {
+func (g *GithubIntegration) queuePullRequestJob(logger sdk.Logger, client sdk.GraphQLClient, userManager *UserManager, historical bool, repoName string, repoID string, beforeCursor string, afterCursor string) job {
 	repoOwner, repoLogin := g.getRepoDetails(repoName)
 	return func(export sdk.Export, pipe sdk.Pipe) error {
-		sdk.LogInfo(logger, "need to run a pull request job starting from "+cursor, "name", repoName, "owner", repoOwner)
+		sdk.LogInfo(logger, "need to run a pull request job starting from "+afterCursor, "name", repoName, "owner", repoOwner)
 		var variables = map[string]interface{}{
 			"first": defaultPageSize,
-			"after": cursor,
+			"after": afterCursor,
 			"owner": repoOwner,
 			"name":  repoLogin,
+		}
+		if !historical && beforeCursor != "" {
+			// only for incremental, sort newest to oldest, up until we hit the beforeCurser (where we last left off)
+			variables["before"] = beforeCursor
 		}
 		customerID := export.CustomerID()
 		var retryCount int
@@ -860,7 +865,7 @@ func (g *GithubIntegration) newHTTPClient(logger sdk.Logger, config sdk.Config) 
 
 // Export is called to tell the integration to run an export
 func (g *GithubIntegration) Export(export sdk.Export) error {
-	logger := sdk.LogWith(g.logger, "customer_id", export.CustomerID(), "job_id", export.JobID())
+	logger := sdk.LogWith(g.logger, "customer_id", export.CustomerID(), "integration_instance_id", export.IntegrationInstanceID(), "job_id", export.JobID())
 	sdk.LogInfo(logger, "export started", "historical", export.Historical())
 	pipe := export.Pipe()
 	config := export.Config()
@@ -995,6 +1000,16 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 		}
 	}
 
+	// if the state key doesnt exist then it's time to run an incremental
+	forceIncremental := !state.Exists(forceIncrementalStateKey)
+	if forceIncremental {
+		sdk.LogInfo(logger, "forcing incremental")
+		// do an incremental daily to catch anything we missed
+		if err := state.SetWithExpires(forceIncrementalStateKey, true, time.Hour*24); err != nil {
+			sdk.LogError(logger, "error setting force incremental state key", "err", err)
+		}
+	}
+
 	if hasPreviousRepos {
 		// make all the repos in this batch so we can see if any of the previous weren't
 		reposFound := make(map[string]bool)
@@ -1015,7 +1030,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 				}
 				// remove the webhook
 				r := repos[repo.Name]
-				g.uninstallRepoWebhook(g.manager.WebHookManager(), httpclient, customerID, instanceID, r.Login, repo.Name, r.ID)
+				g.uninstallRepoWebhook(logger, g.manager.WebHookManager(), httpclient, customerID, instanceID, r.Login, repo.Name, r.ID)
 				// deactivate the project as well if one exists
 				project := previousProjects[repo.ID]
 				if project != nil {
@@ -1057,7 +1072,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 			previousProjects[repo.ID] = project
 		}
 
-		if hookInstalled && !export.Historical() {
+		if hookInstalled && !export.Historical() && !forceIncremental {
 			// if the hook is installed this isn't a historical, we can skip processing this repo
 			sdk.LogDebug(logger, "skipping repo since a webhook is already installed and not historical", "name", node.Name, "id", node.ID)
 			continue
@@ -1183,13 +1198,25 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 			}
 		}
 
+		// NOTE: in an incremental this cursor should be where we last left off, so we will get
+		// all prs (newest to oldest) before this cursor
+		var beforeCursor string
+		if !export.Historical() {
+			found, err := state.Get(g.getRepoKey(repo.Name), &beforeCursor)
+			if err != nil {
+				return fmt.Errorf("error getting before cursor for incremental: %w", err)
+			}
+			if !found {
+				return fmt.Errorf("no before cursor for incremental: %w", err)
+			}
+		}
 		// save off where we started at so we can page from there in subsequent exports
 		if err := state.Set(g.getRepoKey(repo.Name), node.Pullrequests.PageInfo.StartCursor); err != nil {
 			return fmt.Errorf("error saving repo state: %w", err)
 		}
 		if node.Pullrequests.PageInfo.HasNextPage {
 			// queue the pull requests for the next page
-			jobs = append(jobs, g.queuePullRequestJob(logger, client, userManager, r.Name, repo.GetID(), node.Pullrequests.PageInfo.EndCursor))
+			jobs = append(jobs, g.queuePullRequestJob(logger, client, userManager, export.Historical(), r.Name, repo.GetID(), beforeCursor, node.Pullrequests.PageInfo.EndCursor))
 		}
 	}
 

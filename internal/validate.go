@@ -55,7 +55,7 @@ func toConfigAccounts(accounts []*sdk.ConfigAccount) *sdk.ConfigAccounts {
 
 // Validate the github integration
 func (g *GithubIntegration) Validate(validate sdk.Validate) (map[string]interface{}, error) {
-	logger := g.logger
+	logger := sdk.LogWith(g.logger, "customer_id", validate.CustomerID(), "integration_instance_id", validate.IntegrationInstanceID())
 	_, client, err := g.newGraphClient(logger, validate.Config())
 	if err != nil {
 		return nil, fmt.Errorf("error creating client: %w", err)

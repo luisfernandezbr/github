@@ -149,7 +149,7 @@ func (g *GithubIntegration) installRepoWebhookIfRequired(manager sdk.WebHookMana
 	sdk.LogDebug(logger, "creating a repo webhook on github", "name", repoName, "repo_id", repoRefID, "org", login, "params", sdk.Stringify(params))
 	resp, err := client.Post(strings.NewReader(sdk.Stringify(params)), &kv, sdk.WithEndpoint("/repos/"+repoName+"/hooks"))
 	if err != nil {
-		sdk.LogDebug(logger, "error creating a repo webhook on github", "err", err, "repo_id", repoName, "repo_id", repoRefID, "org", login)
+		sdk.LogDebug(logger, "error creating a repo webhook on github", "err", err, "repo_id", repoName, "repo_id", repoRefID, "org", login, "error_body", string(resp.Body))
 		manager.Errored(customerID, integrationInstanceID, refType, repoRefID, sdk.WebHookScopeRepo, err)
 		return false, nil
 	}
@@ -161,21 +161,21 @@ func (g *GithubIntegration) installRepoWebhookIfRequired(manager sdk.WebHookMana
 	return true, nil
 }
 
-func (g *GithubIntegration) uninstallRepoWebhook(manager sdk.WebHookManager, client sdk.HTTPClient, customerID string, integrationInstanceID string, orgLogin string, repoName string, repoRefID string) {
+func (g *GithubIntegration) uninstallRepoWebhook(logger sdk.Logger, manager sdk.WebHookManager, client sdk.HTTPClient, customerID string, integrationInstanceID string, orgLogin string, repoName string, repoRefID string) {
 	webhooks := make([]webhookResponse, 0)
 	var found bool
 	client.Get(&webhooks, sdk.WithEndpoint(fmt.Sprintf("/repos/"+repoName+"/hooks")))
 	for _, hook := range webhooks {
-		sdk.LogDebug(g.logger, "inspecting repo webhook", "name", repoName, "url", hook.URL, "hookid", hook.ID, "hookurl", hook.Config.URL, "id", integrationInstanceID)
+		sdk.LogDebug(logger, "inspecting repo webhook", "name", repoName, "url", hook.URL, "hookid", hook.ID, "hookurl", hook.Config.URL, "id", integrationInstanceID)
 		if strings.Contains(hook.Config.URL, integrationInstanceID) {
 			var res interface{}
 			client.Delete(&res, sdk.WithEndpoint(fmt.Sprintf("/repos/"+repoName+"/hooks/%d", hook.ID)))
 			found = true
-			sdk.LogDebug(g.logger, "deleted repo webhook", "res", sdk.Stringify(res), "name", repoName, "hookid", hook.ID)
+			sdk.LogDebug(logger, "deleted repo webhook", "res", sdk.Stringify(res), "name", repoName, "hookid", hook.ID)
 		}
 	}
 	if !found {
-		sdk.LogDebug(g.logger, "no repo webhook found for repo: "+repoName)
+		sdk.LogDebug(logger, "no repo webhook found for repo: "+repoName)
 	}
 	manager.Delete(customerID, integrationInstanceID, refType, repoRefID, sdk.WebHookScopeRepo)
 	if !found && orgLogin != "" {
@@ -253,15 +253,16 @@ func (g *GithubIntegration) registerOrgWebhook(manager sdk.WebHookManager, clien
 
 // WebHook is called when a webhook is received on behalf of the integration
 func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
+	logger := sdk.LogWith(g.logger, "customer_id", webhook.CustomerID(), "integration_instance_id", webhook.IntegrationInstanceID())
 	event := webhook.Headers()["x-github-event"]
-	sdk.LogInfo(g.logger, "webhook received", "headers", webhook.Headers(), "event", event)
+	sdk.LogInfo(logger, "webhook received", "headers", webhook.Headers(), "event", event)
 	obj, err := github.ParseWebHook(event, webhook.Bytes())
 	if err != nil {
 		return err
 	}
 	client := g.testClient
 	if client == nil {
-		_, cl, err := g.newGraphClient(g.logger, webhook.Config())
+		_, cl, err := g.newGraphClient(logger, webhook.Config())
 		if err != nil {
 			return err
 		}
@@ -272,7 +273,7 @@ func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 	case *github.PushEvent:
 		repoLogin := getPushRepoOwnerLogin(v.Repo)
 		userManager := NewUserManager(webhook.CustomerID(), []string{repoLogin}, webhook, webhook.State(), webhook.Pipe(), g, webhook.IntegrationInstanceID(), false)
-		commits, err := g.fromPushEvent(g.logger, client, userManager, webhook, webhook.CustomerID(), v)
+		commits, err := g.fromPushEvent(logger, client, userManager, webhook, webhook.CustomerID(), v)
 		if err != nil {
 			return err
 		}
@@ -283,7 +284,7 @@ func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 		repoLogin := getRepoOwnerLogin(v.Repo)
 		userManager := NewUserManager(webhook.CustomerID(), []string{repoLogin}, webhook, webhook.State(), webhook.Pipe(), g, webhook.IntegrationInstanceID(), false)
 		if v.Action != nil && (*v.Action == "review_requested" || *v.Action == "review_request_removed") {
-			obj, err := g.fromPullRequestReviewRequestedEvent(g.logger, client, userManager, webhook, webhook.CustomerID(), v)
+			obj, err := g.fromPullRequestReviewRequestedEvent(logger, client, userManager, webhook, webhook.CustomerID(), v)
 			if err != nil {
 				return err
 			}
@@ -291,7 +292,7 @@ func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 				objects = []sdk.Model{obj}
 			}
 		} else {
-			obj, err := g.fromPullRequestEvent(g.logger, client, userManager, webhook, webhook.CustomerID(), v)
+			obj, err := g.fromPullRequestEvent(logger, client, userManager, webhook, webhook.CustomerID(), v)
 			if err != nil {
 				return err
 			}
@@ -302,7 +303,7 @@ func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 	case *github.PullRequestReviewEvent:
 		repoLogin := getRepoOwnerLogin(v.Repo)
 		userManager := NewUserManager(webhook.CustomerID(), []string{repoLogin}, webhook, webhook.State(), webhook.Pipe(), g, webhook.IntegrationInstanceID(), false)
-		obj, err := g.fromPullRequestReviewEvent(g.logger, client, userManager, webhook, webhook.CustomerID(), v)
+		obj, err := g.fromPullRequestReviewEvent(logger, client, userManager, webhook, webhook.CustomerID(), v)
 		if err != nil {
 			return err
 		}
@@ -318,7 +319,7 @@ func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 		repoLogin := getRepoOwnerLogin(v.Repo)
 		if isIssueCommentPR(v) {
 			userManager := NewUserManager(webhook.CustomerID(), []string{repoLogin}, webhook, webhook.State(), webhook.Pipe(), g, webhook.IntegrationInstanceID(), false)
-			obj, err := g.fromPullRequestCommentEvent(g.logger, client, userManager, webhook, webhook.CustomerID(), v)
+			obj, err := g.fromPullRequestCommentEvent(logger, client, userManager, webhook, webhook.CustomerID(), v)
 			if err != nil {
 				return err
 			}
@@ -327,7 +328,7 @@ func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 			}
 		} else {
 			userManager := NewUserManager(webhook.CustomerID(), []string{repoLogin}, webhook, webhook.State(), webhook.Pipe(), g, webhook.IntegrationInstanceID(), false)
-			obj, err := g.fromIssueCommentEvent(g.logger, client, userManager, webhook, webhook.CustomerID(), webhook.IntegrationInstanceID(), v)
+			obj, err := g.fromIssueCommentEvent(logger, client, userManager, webhook, webhook.CustomerID(), webhook.IntegrationInstanceID(), v)
 			if err != nil {
 				return err
 			}
@@ -336,7 +337,7 @@ func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 			}
 		}
 	case *github.RepositoryEvent:
-		repo, project, capability := g.fromRepositoryEvent(g.logger, webhook.State(), webhook.IntegrationInstanceID(), webhook.CustomerID(), v)
+		repo, project, capability := g.fromRepositoryEvent(logger, webhook.State(), webhook.IntegrationInstanceID(), webhook.CustomerID(), v)
 		if err != nil {
 			return err
 		}
@@ -352,7 +353,7 @@ func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 	case *github.IssuesEvent:
 		repoLogin := getRepoOwnerLogin(v.Repo)
 		userManager := NewUserManager(webhook.CustomerID(), []string{repoLogin}, webhook, webhook.State(), webhook.Pipe(), g, webhook.IntegrationInstanceID(), false)
-		issue, err := g.fromIssueEvent(g.logger, userManager, webhook.IntegrationInstanceID(), webhook.CustomerID(), v)
+		issue, err := g.fromIssueEvent(logger, userManager, webhook.IntegrationInstanceID(), webhook.CustomerID(), v)
 		if err != nil {
 			return err
 		}
@@ -360,19 +361,19 @@ func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 			objects = []sdk.Model{issue}
 		}
 	case *github.ProjectEvent:
-		return g.fetchRepoProject(g.logger, client, webhook.Pipe(), webhook, webhook.CustomerID(), webhook.IntegrationInstanceID(), v.Repo.GetFullName(), v.Repo.GetNodeID(), v.Project.GetNumber())
+		return g.fetchRepoProject(logger, client, webhook.Pipe(), webhook, webhook.CustomerID(), webhook.IntegrationInstanceID(), v.Repo.GetFullName(), v.Repo.GetNodeID(), v.Project.GetNumber())
 	case *github.ProjectCardEvent:
-		return g.fetchRepoProject(g.logger, client, webhook.Pipe(), webhook, webhook.CustomerID(), webhook.IntegrationInstanceID(), v.Repo.GetFullName(), v.Repo.GetNodeID(), int(v.GetProjectCard().GetProjectID()))
+		return g.fetchRepoProject(logger, client, webhook.Pipe(), webhook, webhook.CustomerID(), webhook.IntegrationInstanceID(), v.Repo.GetFullName(), v.Repo.GetNodeID(), int(v.GetProjectCard().GetProjectID()))
 	case *github.ProjectColumnEvent:
 		num, err := getProjectIDfromURL(v.ProjectColumn.GetProjectURL())
 		if err != nil {
 			return fmt.Errorf("error getting project id: %w", err)
 		}
-		return g.fetchRepoProject(g.logger, client, webhook.Pipe(), webhook, webhook.CustomerID(), webhook.IntegrationInstanceID(), v.Repo.GetFullName(), v.Repo.GetNodeID(), num)
+		return g.fetchRepoProject(logger, client, webhook.Pipe(), webhook, webhook.CustomerID(), webhook.IntegrationInstanceID(), v.Repo.GetFullName(), v.Repo.GetNodeID(), num)
 	case *github.MilestoneEvent:
 		repoLogin := getRepoOwnerLogin(v.Repo)
 		userManager := NewUserManager(webhook.CustomerID(), []string{repoLogin}, webhook, webhook.State(), webhook.Pipe(), g, webhook.IntegrationInstanceID(), false)
-		issue, err := g.fromMilestoneEvent(g.logger, client, userManager, webhook, webhook.CustomerID(), webhook.IntegrationInstanceID(), v)
+		issue, err := g.fromMilestoneEvent(logger, client, userManager, webhook, webhook.CustomerID(), webhook.IntegrationInstanceID(), v)
 		if err != nil {
 			return err
 		}
@@ -381,7 +382,7 @@ func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 		}
 	}
 	for _, object := range objects {
-		sdk.LogDebug(g.logger, "sending webhook to pipe", "data", object.Stringify())
+		sdk.LogDebug(logger, "sending webhook to pipe", "data", object.Stringify())
 		if err := webhook.Pipe().Write(object); err != nil {
 			return err
 		}
