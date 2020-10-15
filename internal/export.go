@@ -20,6 +20,7 @@ const (
 	defaultPullRequestCommitPageSize = 100
 	previousReposStateKey            = "previous_repos"
 	previousProjectsStateKey         = "previous_projects"
+	forceIncrementalStateKey         = "force_incremental"
 )
 
 type job func(export sdk.Export, pipe sdk.Pipe) error
@@ -864,7 +865,7 @@ func (g *GithubIntegration) newHTTPClient(logger sdk.Logger, config sdk.Config) 
 
 // Export is called to tell the integration to run an export
 func (g *GithubIntegration) Export(export sdk.Export) error {
-	logger := sdk.LogWith(g.logger, "customer_id", export.CustomerID(), "job_id", export.JobID())
+	logger := sdk.LogWith(g.logger, "customer_id", export.CustomerID(), "integration_instance_id", export.IntegrationInstanceID(), "job_id", export.JobID())
 	sdk.LogInfo(logger, "export started", "historical", export.Historical())
 	pipe := export.Pipe()
 	config := export.Config()
@@ -999,6 +1000,16 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 		}
 	}
 
+	// if the state key doesnt exist then it's time to run an incremental
+	forceInremental := !state.Exists(forceIncrementalStateKey)
+	if forceInremental {
+		sdk.LogInfo(logger, "forcing incremental")
+		// do an incremental daily to catch anything we missed
+		if err := state.SetWithExpires(forceIncrementalStateKey, true, time.Hour*24); err != nil {
+			sdk.LogError(logger, "error setting force incremental state key", "err", err)
+		}
+	}
+
 	if hasPreviousRepos {
 		// make all the repos in this batch so we can see if any of the previous weren't
 		reposFound := make(map[string]bool)
@@ -1061,7 +1072,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 			previousProjects[repo.ID] = project
 		}
 
-		if hookInstalled && !export.Historical() {
+		if hookInstalled && !export.Historical() && !forceInremental {
 			// if the hook is installed this isn't a historical, we can skip processing this repo
 			sdk.LogDebug(logger, "skipping repo since a webhook is already installed and not historical", "name", node.Name, "id", node.ID)
 			continue
