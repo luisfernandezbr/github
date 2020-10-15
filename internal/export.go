@@ -1001,8 +1001,8 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 	}
 
 	// if the state key doesnt exist then it's time to run an incremental
-	forceInremental := !state.Exists(forceIncrementalStateKey)
-	if forceInremental {
+	forceIncremental := !state.Exists(forceIncrementalStateKey)
+	if forceIncremental {
 		sdk.LogInfo(logger, "forcing incremental")
 		// do an incremental daily to catch anything we missed
 		if err := state.SetWithExpires(forceIncrementalStateKey, true, time.Hour*24); err != nil {
@@ -1072,7 +1072,7 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 			previousProjects[repo.ID] = project
 		}
 
-		if hookInstalled && !export.Historical() && !forceInremental {
+		if hookInstalled && !export.Historical() && !forceIncremental {
 			// if the hook is installed this isn't a historical, we can skip processing this repo
 			sdk.LogDebug(logger, "skipping repo since a webhook is already installed and not historical", "name", node.Name, "id", node.ID)
 			continue
