@@ -1,0 +1,91 @@
+[
+  {
+    "type": "Repository",
+    "id": 556071136,
+    "name": "web",
+    "active": true,
+    "events": [
+      "pull_request",
+      "push",
+      "release",
+      "repository"
+    ],
+    "config": {
+      "content_type": "json",
+      "url": "https://gitlab.com/api/v4/projects/someproject",
+      "insecure_ssl": "0"
+    },
+    "updated_at": "2020-06-19T16:36:06Z",
+    "created_at": "2020-06-19T16:36:06Z",
+    "url": "https://api.github.com/repos/pinpt/agent/hooks/556071136",
+    "test_url": "https://api.github.com/repos/pinpt/agent/hooks/556071136/test",
+    "ping_url": "https://api.github.com/repos/pinpt/agent/hooks/556071136/pings",
+    "last_response": {
+      "code": 404,
+      "status": "missing",
+      "message": "Invalid HTTP Response: 404"
+    }
+  },
+  {
+    "type": "Repository",
+    "id": 228888199,
+    "name": "web",
+    "active": true,
+    "events": [
+      "issue_comment",
+      "pull_request",
+      "push"
+    ],
+    "config": {
+      "content_type": "json",
+      "insecure_ssl": "0",
+      "url": "https://event.api.pinpoint.com/hook/oldpinpointtoken"
+    },
+    "updated_at": "2020-06-24T20:49:18Z",
+    "created_at": "2020-06-24T20:49:18Z",
+    "url": "https://api.github.com/repos/pinpt/agent/hooks/228888199",
+    "test_url": "https://api.github.com/repos/pinpt/agent/hooks/228888199/test",
+    "ping_url": "https://api.github.com/repos/pinpt/agent/hooks/228888199/pings",
+    "last_response": {
+      "code": 202,
+      "status": "active",
+      "message": "OK"
+    }
+  },
+  {
+    "type": "Repository",
+    "id": 232672340,
+    "name": "web",
+    "active": true,
+    "events": [
+      "commit_comment",
+      "issues",
+      "issue_comment",
+      "milestone",
+      "project",
+      "project_card",
+      "project_column",
+      "pull_request",
+      "pull_request_review",
+      "pull_request_review_comment",
+      "push",
+      "repository"
+    ],
+    "config": {
+      "content_type": "json",
+      "insecure_ssl": "0",
+      "secret": "********",
+      "url": "https://event.api.pinpoint.com/hook/oldpinpointtoken"
+    },
+    "updated_at": "2020-07-08T22:37:11Z",
+    "created_at": "2020-07-08T22:37:11Z",
+    "url": "https://api.github.com/repos/pinpt/agent/hooks/232672340",
+    "test_url": "https://api.github.com/repos/pinpt/agent/hooks/232672340/test",
+    "ping_url": "https://api.github.com/repos/pinpt/agent/hooks/232672340/pings",
+    "last_response": {
+      "code": 202,
+      "status": "active",
+      "message": "OK"
+    }
+  }
+]
