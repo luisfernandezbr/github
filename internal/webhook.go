@@ -97,7 +97,7 @@ func getInstalledWebhooks(client sdk.HTTPClient, repoName string) ([]webhookResp
 	return webhooks, nil
 }
 
-func registerWebhook(logger sdk.Logger, client sdk.HTTPClient, repoName string, url string, integrationInstanceID string) error {
+func registerWebhook(logger sdk.Logger, client sdk.HTTPClient, repoName string, url string, secret string) error {
 	// need to try and install
 	params := map[string]interface{}{
 		"name": "web",
@@ -105,7 +105,7 @@ func registerWebhook(logger sdk.Logger, client sdk.HTTPClient, repoName string, 
 			"url":          url,
 			"content_type": "json",
 			"insecure_ssl": "0",
-			"secret":       integrationInstanceID,
+			"secret":       secret,
 		},
 		"events": webhookEvents,
 		"active": true,
@@ -173,7 +173,7 @@ func (g *GithubIntegration) installRepoWebhookIfRequired(manager sdk.WebHookMana
 		return false, fmt.Errorf("error creating webhook url for %s: %w", login, err)
 	}
 	// add new webhook
-	if err := registerWebhook(logger, client, repoName, url, integrationInstanceID); err != nil {
+	if err := registerWebhook(logger, client, repoName, url, manager.Secret()); err != nil {
 		// TODO(robin): add back manager errors
 		// manager.Errored(customerID, integrationInstanceID, refType, repoRefID, sdk.WebHookScopeRepo, err)
 		sdk.LogWarn(logger, "error registering webhook", "err", err)
@@ -218,7 +218,7 @@ func (g *GithubIntegration) unregisterOrgWebhook(manager sdk.WebHookManager, cli
 	return manager.Delete(customerID, integrationInstanceID, refType, login, sdk.WebHookScopeOrg)
 }
 
-func (g *GithubIntegration) registerOrgWebhook(manager sdk.WebHookManager, client sdk.HTTPClient, customerID string, integrationInstanceID string, login string) error {
+func (g *GithubIntegration) registerOrgWebhook(logger sdk.Logger, manager sdk.WebHookManager, client sdk.HTTPClient, customerID string, integrationInstanceID string, login string) error {
 	if g.isOrgWebHookInstalled(manager, customerID, integrationInstanceID, login) {
 		return nil
 	}
@@ -258,7 +258,7 @@ func (g *GithubIntegration) registerOrgWebhook(manager sdk.WebHookManager, clien
 		resp, err = client.Post(strings.NewReader(sdk.Stringify(params)), &kv, sdk.WithEndpoint("/orgs/"+login+"/hooks"))
 		if err != nil {
 			if ok, status, _ := sdk.IsHTTPError(err); ok && status == http.StatusNotFound {
-				sdk.LogInfo(g.logger, "couldn't install an org webhook, unauthorized", "org", login)
+				sdk.LogInfo(logger, "couldn't install an org webhook, unauthorized", "org", login)
 				g.manager.WebHookManager().Delete(customerID, integrationInstanceID, refType, login, sdk.WebHookScopeOrg)
 				return nil
 			}
@@ -276,7 +276,7 @@ func (g *GithubIntegration) registerOrgWebhook(manager sdk.WebHookManager, clien
 
 // WebHook is called when a webhook is received on behalf of the integration
 func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
-	logger := sdk.LogWith(g.logger, "customer_id", webhook.CustomerID(), "integration_instance_id", webhook.IntegrationInstanceID())
+	logger := webhook.Logger()
 	event := webhook.Headers()["x-github-event"]
 	sdk.LogInfo(logger, "webhook received", "headers", webhook.Headers(), "event", event)
 	obj, err := github.ParseWebHook(event, webhook.Bytes())
@@ -296,7 +296,7 @@ func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 	case *github.PushEvent:
 		repoLogin := getPushRepoOwnerLogin(v.Repo)
 		userManager := NewUserManager(webhook.CustomerID(), []string{repoLogin}, webhook, webhook.State(), webhook.Pipe(), g, webhook.IntegrationInstanceID(), false)
-		commits, err := g.fromPushEvent(logger, client, userManager, webhook, webhook.CustomerID(), v)
+		commits, err := g.fromPushEvent(logger, userManager, webhook.CustomerID(), v)
 		if err != nil {
 			return err
 		}

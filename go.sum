@@ -340,6 +340,10 @@ github.com/pinpt/agent/v4 v4.0.18-0.20201019230920-497e230a800d h1:Ys8dDPcY+Kmf2
 github.com/pinpt/agent/v4 v4.0.18-0.20201019230920-497e230a800d/go.mod h1:076kdQXxw/WAgLMkRRBKJOC9Hzzk/g9tazQ0LrtM+yk=
 github.com/pinpt/agent/v4 v4.0.18-0.20201020165734-b4fde5742f61 h1:nsznEWB45RCyX2MCLN0IrgmhYlyNJxU4aglfXuKog2c=
 github.com/pinpt/agent/v4 v4.0.18-0.20201020165734-b4fde5742f61/go.mod h1:076kdQXxw/WAgLMkRRBKJOC9Hzzk/g9tazQ0LrtM+yk=
+github.com/pinpt/agent/v4 v4.0.20-0.20201021205620-bd8ba32aa26e h1:MebeudEDTfQW9XSzHbanyi7rfYPohmWt9IoR8m1Zc7w=
+github.com/pinpt/agent/v4 v4.0.20-0.20201021205620-bd8ba32aa26e/go.mod h1:076kdQXxw/WAgLMkRRBKJOC9Hzzk/g9tazQ0LrtM+yk=
+github.com/pinpt/agent/v4 v4.0.20-0.20201021212431-5c249e6b4cab h1:ThlWmnkIbQwpuWuVxhFJhNW+vhTR1BfnyKo2jDC1qkI=
+github.com/pinpt/agent/v4 v4.0.20-0.20201021212431-5c249e6b4cab/go.mod h1:076kdQXxw/WAgLMkRRBKJOC9Hzzk/g9tazQ0LrtM+yk=
 github.com/pinpt/go-common/v10 v10.0.17/go.mod h1:uRe9KzBE26kjqD+2UgreBQqesesXyBUEIjBT2NEK3kk=
 github.com/pinpt/go-common/v10 v10.0.25 h1:glnS5b6DoxGbRjo4/iPgDtktEmxAPm75DqRkkHYDbFA=
 github.com/pinpt/go-common/v10 v10.0.25/go.mod h1:uRe9KzBE26kjqD+2UgreBQqesesXyBUEIjBT2NEK3kk=

@@ -35,6 +35,7 @@ func (m *mockWebhookManager) Errored(customerID string, integrationInstanceID st
 func (m *mockWebhookManager) HookURL(customerID string, integrationInstanceID string, refType string, refID string, scope sdk.WebHookScope) (string, error) {
 	return m.URL, nil
 }
+func (m *mockWebhookManager) Secret() string { return "pinpoint" }
 func (m *mockWebhookManager) CreateSharedWebhook(customerID string, integrationInstanceID string, refType string, refID string, scope sdk.WebHookScope) (string, error) {
 	return m.URL, nil
 }
