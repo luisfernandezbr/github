@@ -160,9 +160,12 @@ func (g *GithubIntegration) installRepoWebhookIfRequired(manager sdk.WebHookMana
 	var oldWebhooks []webhookResponse
 	for _, webhook := range webhooks {
 		if manager.IsPinpointWebhook(webhook.Config.URL) {
-			if isSharedWebhook(webhook.Config.URL) && isCorrectVersion(webhook.Config.URL) {
-				// if new webhook exists return true
-				return true, nil
+			if isSharedWebhook(webhook.Config.URL) {
+				if isCorrectVersion(webhook.Config.URL) {
+					// if new webhook exists return true
+					return true, nil
+				}
+				sdk.LogInfo(logger, "reinstalling webhook", "version", hookVersion)
 			}
 			oldWebhooks = append(oldWebhooks, webhook)
 		}
