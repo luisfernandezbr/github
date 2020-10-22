@@ -1,6 +1,8 @@
 package internal
 
 import (
+	"crypto/hmac"
+	"crypto/sha1"
 	"fmt"
 	"net/http"
 	"strings"
@@ -145,6 +147,10 @@ func isSharedWebhook(url string) bool {
 	return strings.Contains(url, "webhook.api")
 }
 
+func isCorrectVersion(theurl string) bool {
+	return strings.Contains(theurl, "version="+hookVersion)
+}
+
 func (g *GithubIntegration) installRepoWebhookIfRequired(manager sdk.WebHookManager, logger sdk.Logger, client sdk.HTTPClient, customerID string, integrationInstanceID string, login string, repoName string, repoRefID string) (bool, error) {
 	// Get webhooks that are installed
 	webhooks, err := getInstalledWebhooks(client, repoName)
@@ -154,7 +160,7 @@ func (g *GithubIntegration) installRepoWebhookIfRequired(manager sdk.WebHookMana
 	var oldWebhooks []webhookResponse
 	for _, webhook := range webhooks {
 		if manager.IsPinpointWebhook(webhook.Config.URL) {
-			if isSharedWebhook(webhook.Config.URL) {
+			if isSharedWebhook(webhook.Config.URL) && isCorrectVersion(webhook.Config.URL) {
 				// if new webhook exists return true
 				return true, nil
 			}
@@ -172,6 +178,7 @@ func (g *GithubIntegration) installRepoWebhookIfRequired(manager sdk.WebHookMana
 	if err != nil {
 		return false, fmt.Errorf("error creating webhook url for %s: %w", login, err)
 	}
+	url += "?version=" + hookVersion
 	// add new webhook
 	if err := registerWebhook(logger, client, repoName, url, manager.Secret()); err != nil {
 		// TODO(robin): add back manager errors
@@ -274,12 +281,24 @@ func (g *GithubIntegration) registerOrgWebhook(logger sdk.Logger, manager sdk.We
 	return nil
 }
 
+func verifyWebhookSignature(signature string, secret string, body []byte) bool {
+	mac := hmac.New(sha1.New, []byte(secret))
+	sum := mac.Sum(body)
+	return hmac.Equal([]byte(signature), sum)
+}
+
 // WebHook is called when a webhook is received on behalf of the integration
 func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 	logger := webhook.Logger()
 	event := webhook.Headers()["x-github-event"]
 	sdk.LogInfo(logger, "webhook received", "headers", webhook.Headers(), "event", event)
-	obj, err := github.ParseWebHook(event, webhook.Bytes())
+	sig := webhook.Headers()["x-hub-signature"]
+	buf := webhook.Bytes()
+	if !verifyWebhookSignature(sig, g.manager.WebHookManager().Secret(), buf) {
+		sdk.LogWarn(logger, "webhook signature was invalid, not loading", "signature", sig)
+		return nil
+	}
+	obj, err := github.ParseWebHook(event, buf)
 	if err != nil {
 		return err
 	}

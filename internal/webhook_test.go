@@ -1,6 +1,8 @@
 package internal
 
 import (
+	"crypto/hmac"
+	"crypto/sha1"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -133,7 +135,7 @@ func TestInstallRepoWebhookIfRequiredMigrateToNew(t *testing.T) {
 			path := getEndpoint(options)
 			assert.EqualValues("/repos/pinpt/pipeline/hooks", path)
 			buf, _ := ioutil.ReadAll(data)
-			assert.EqualValues("{\"active\":true,\"config\":{\"content_type\":\"json\",\"insecure_ssl\":\"0\",\"secret\":\"1\",\"url\":\"https://testURL.com\"},\"events\":[\"push\",\"pull_request\",\"commit_comment\",\"issue_comment\",\"issues\",\"project_card\",\"project_column\",\"project\",\"pull_request_review\",\"pull_request_review_comment\",\"repository\",\"milestone\"],\"name\":\"web\"}", string(buf))
+			assert.EqualValues(fmt.Sprintf("{\"active\":true,\"config\":{\"content_type\":\"json\",\"insecure_ssl\":\"0\",\"secret\":\"pinpoint\",\"url\":\"https://testURL.com?version=%s\"},\"events\":[\"push\",\"pull_request\",\"commit_comment\",\"issue_comment\",\"issues\",\"project_card\",\"project_column\",\"project\",\"pull_request_review\",\"pull_request_review_comment\",\"repository\",\"milestone\"],\"name\":\"web\"}", hookVersion), string(buf))
 			createdWebhook = true
 			return returnJSONFromFile("testdata/create_repo_webhook_response.json", http.StatusCreated, out)
 		}
@@ -147,4 +149,13 @@ func TestInstallRepoWebhookIfRequiredMigrateToNew(t *testing.T) {
 	assert.Len(deletedWebhooks, 2)
 	assert.Contains(deletedWebhooks, "228888199")
 	assert.Contains(deletedWebhooks, "232672340")
+}
+
+func TestVerifyWebhookSignature(t *testing.T) {
+	assert := assert.New(t)
+	secret := []byte("aaaaa")
+	body := []byte("{\"a\":\"b\"")
+	mac := hmac.New(sha1.New, secret)
+	sig := mac.Sum(body)
+	assert.True(verifyWebhookSignature(string(sig), string(secret), body))
 }
