@@ -113,7 +113,7 @@ func (g *GithubIntegration) Dismiss(instance sdk.Instance) error {
 }
 
 // Stop is called when the integration is shutting down for cleanup
-func (g *GithubIntegration) Stop() error {
-	sdk.LogInfo(g.logger, "stopping")
+func (g *GithubIntegration) Stop(logger sdk.Logger) error {
+	sdk.LogInfo(logger, "stopping")
 	return nil
 }
