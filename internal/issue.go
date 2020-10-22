@@ -332,8 +332,6 @@ const createIssueQuery = `mutation createIssue($repositoryID: ID!,$title: String
 
 func (g *GithubIntegration) createIssue(logger sdk.Logger, userManager *UserManager, mutation *sdk.WorkIssueCreateMutation, user sdk.MutationUser) (*sdk.MutationResponse, error) {
 
-	sdk.LogDebug(logger, "internet", "debug", fmt.Sprintf("%+q", user.APIKeyAuth), "debug2", sdk.Stringify(user))
-
 	var c sdk.Config
 	c.APIKeyAuth = user.APIKeyAuth
 	c.BasicAuth = user.BasicAuth
