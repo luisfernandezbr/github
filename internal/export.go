@@ -865,7 +865,7 @@ func (g *GithubIntegration) newHTTPClient(logger sdk.Logger, config sdk.Config) 
 
 // Export is called to tell the integration to run an export
 func (g *GithubIntegration) Export(export sdk.Export) error {
-	logger := sdk.LogWith(g.logger, "customer_id", export.CustomerID(), "integration_instance_id", export.IntegrationInstanceID(), "job_id", export.JobID())
+	logger := sdk.LogWith(export.Logger(), "integration_instance_id", export.IntegrationInstanceID(), "job_id", export.JobID())
 	sdk.LogInfo(logger, "export started", "historical", export.Historical())
 	pipe := export.Pipe()
 	config := export.Config()
@@ -1207,7 +1207,8 @@ func (g *GithubIntegration) Export(export sdk.Export) error {
 				return fmt.Errorf("error getting before cursor for incremental: %w", err)
 			}
 			if !found {
-				return fmt.Errorf("no before cursor for incremental: %w", err)
+				// this is not terrible it just means we dont know how far back we need to export prs
+				sdk.LogWarn(logger, "no before cursor found for incremental, all prs will be exported", "repo", repo.Name)
 			}
 		}
 		// save off where we started at so we can page from there in subsequent exports

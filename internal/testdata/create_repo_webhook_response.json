@@ -1,0 +1,35 @@
+{
+  "type": "Repository",
+  "id": 12345678,
+  "name": "web",
+  "active": true,
+  "events": [
+    "commit_comment",
+    "issues",
+    "issue_comment",
+    "milestone",
+    "project",
+    "project_card",
+    "project_column",
+    "pull_request",
+    "pull_request_review",
+    "pull_request_review_comment",
+    "push",
+    "repository"
+],
+  "config": {
+    "content_type": "json",
+    "insecure_ssl": "0",
+    "url": "https://exampleURL.com/"
+  },
+  "updated_at": "2019-06-03T00:57:16Z",
+  "created_at": "2019-06-03T00:57:16Z",
+  "url": "https://api.github.com/repos/octocat/Hello-World/hooks/12345678",
+  "test_url": "https://api.github.com/repos/octocat/Hello-World/hooks/12345678/test",
+  "ping_url": "https://api.github.com/repos/octocat/Hello-World/hooks/12345678/pings",
+  "last_response": {
+    "code": null,
+    "status": "unused",
+    "message": null
+  }
+}
