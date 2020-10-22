@@ -301,3 +301,115 @@ func (c comment) ToModel(logger sdk.Logger, userManager *UserManager, customerID
 	err := userManager.emitAuthor(logger, c.Author)
 	return &comment, err
 }
+
+const createIssueQuery = `mutation createIssue($repositoryID: ID!,$title: String!,$body: String!) {
+	createIssue(input:{
+	  repositoryId:$repositoryID,
+	  title:$title,
+	  body:$body
+	}) {
+	  issue{
+		id
+		title
+		number
+		url
+		state
+		repository {
+			id
+			nameWithOwner
+		}
+		createdAt
+		updatedAt
+		author {
+			login
+		}
+		milestone {
+			id
+		}
+	  }
+	}
+  }`
+
+func (g *GithubIntegration) createIssue(logger sdk.Logger, userManager *UserManager, mutation *sdk.WorkIssueCreateMutation, user sdk.MutationUser) (*sdk.MutationResponse, error) {
+
+	sdk.LogDebug(logger, "internet", "debug", fmt.Sprintf("%+q", user.APIKeyAuth), "debug2", sdk.Stringify(user))
+
+	var c sdk.Config
+	c.APIKeyAuth = user.APIKeyAuth
+	c.BasicAuth = user.BasicAuth
+	c.OAuth2Auth = user.OAuth2Auth
+	_, client, err := g.newGraphClient(logger, c)
+	if err != nil {
+		return nil, fmt.Errorf("error creating http client: %w", err)
+	}
+
+	input := make(map[string]interface{})
+	input["repositoryID"] = mutation.ProjectRefID
+	input["title"] = mutation.Title
+	input["body"] = mutation.Description
+
+	var response struct {
+		Data struct {
+			CreateIssue struct {
+				Issue CreateIssue `json:"issue"`
+			} `json:"createIssue"`
+		} `json:"data"`
+		Errors []struct {
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+
+	sdk.LogDebug(logger, "sending issue creation mutation", "input", input, "user", user.RefID)
+	if err := client.Query(createIssueQuery, input, &response); err != nil {
+		return nil, err
+	}
+
+	if len(response.Errors) > 0 {
+		return nil, fmt.Errorf("error creating issue %v", response.Errors)
+	}
+
+	workIssue, err := response.Data.CreateIssue.Issue.toModel(logger, userManager, userManager.instanceid, userManager.customerID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &sdk.MutationResponse{
+		RefID:    sdk.StringPointer(response.Data.CreateIssue.Issue.RefID),
+		EntityID: sdk.StringPointer(workIssue.ID),
+		URL:      sdk.StringPointer(workIssue.URL),
+	}, nil
+}
+
+// CreateIssue create issue
+type CreateIssue struct {
+	RefID      string `json:"id"`
+	Title      string `json:"title"`
+	Body       string `json:"body"`
+	Number     int    `json:"number"`
+	URL        string `json:"url"`
+	State      string `json:"state"`
+	Repository struct {
+		ID            string `json:"id"`
+		NameWithOwner string `json:"nameWithOwner"`
+	} `json:"repository"`
+	CreatedAt time.Time    `json:"createdAt"`
+	Author    *github.User `json:"author"`
+}
+
+func (c *CreateIssue) toModel(logger sdk.Logger, userManager *UserManager, integrationInstanceID string, customerID string) (*sdk.WorkIssue, error) {
+
+	var issue issue
+
+	issue.ID = c.RefID
+	issue.CreatedAt = c.CreatedAt
+	issue.UpdatedAt = c.CreatedAt
+	issue.State = c.State
+	issue.URL = c.URL
+	issue.Title = c.Title
+	issue.Body = c.Body
+	issue.Number = c.Number
+	issue.Author = userToAuthor(c.Author)
+	projectID := sdk.NewWorkProjectID(customerID, c.Repository.ID, refType)
+	return issue.ToModel(logger, userManager, customerID, integrationInstanceID, c.Repository.NameWithOwner, projectID)
+
+}

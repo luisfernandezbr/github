@@ -1,6 +1,8 @@
 package internal
 
-import "github.com/pinpt/agent/v4/sdk"
+import (
+	"github.com/pinpt/agent/v4/sdk"
+)
 
 // Mutation is called when a mutation request is received on behalf of the integration
 func (g *GithubIntegration) Mutation(mutation sdk.Mutation) (*sdk.MutationResponse, error) {
@@ -8,6 +10,14 @@ func (g *GithubIntegration) Mutation(mutation sdk.Mutation) (*sdk.MutationRespon
 	sdk.LogInfo(logger, "mutation request received", "action", mutation.Action(), "id", mutation.ID(), "customer_id", mutation.CustomerID(), "model", mutation.Model())
 	switch mutation.Action() {
 	case sdk.CreateAction:
+		switch v := mutation.Payload().(type) {
+		case *sdk.WorkIssueCreateMutation:
+			switch *v.Type.Name {
+			case "Bug":
+				userManager := NewUserManager(mutation.CustomerID(), []string{""}, mutation, mutation.State(), mutation.Pipe(), g, mutation.IntegrationInstanceID(), false)
+				return g.createIssue(logger, userManager, v, mutation.User())
+			}
+		}
 		break
 	case sdk.UpdateAction:
 		switch v := mutation.Payload().(type) {

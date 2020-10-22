@@ -117,7 +117,7 @@ func (a gitUser) ToModel(customerID string, integrationInstanceID string) *sdk.S
 
 func userToAuthor(user *github.User) author {
 	var author author
-	if user.ID != nil {
+	if user != nil && user.ID != nil {
 		author.ID = user.GetNodeID()
 	}
 	author.Avatar = user.GetAvatarURL()
