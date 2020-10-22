@@ -1,8 +1,6 @@
 package internal
 
 import (
-	"crypto/hmac"
-	"crypto/sha1"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -149,13 +147,4 @@ func TestInstallRepoWebhookIfRequiredMigrateToNew(t *testing.T) {
 	assert.Len(deletedWebhooks, 2)
 	assert.Contains(deletedWebhooks, "228888199")
 	assert.Contains(deletedWebhooks, "232672340")
-}
-
-func TestVerifyWebhookSignature(t *testing.T) {
-	assert := assert.New(t)
-	secret := []byte("aaaaa")
-	body := []byte("{\"a\":\"b\"")
-	mac := hmac.New(sha1.New, secret)
-	sig := mac.Sum(body)
-	assert.True(verifyWebhookSignature(string(sig), string(secret), body))
 }

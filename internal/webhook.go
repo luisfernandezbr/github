@@ -1,8 +1,6 @@
 package internal
 
 import (
-	"crypto/hmac"
-	"crypto/sha1"
 	"fmt"
 	"net/http"
 	"strings"
@@ -284,12 +282,6 @@ func (g *GithubIntegration) registerOrgWebhook(logger sdk.Logger, manager sdk.We
 	return nil
 }
 
-func verifyWebhookSignature(signature string, secret string, body []byte) bool {
-	mac := hmac.New(sha1.New, []byte(secret))
-	sum := mac.Sum(body)
-	return hmac.Equal([]byte(signature), sum)
-}
-
 // WebHook is called when a webhook is received on behalf of the integration
 func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 	logger := webhook.Logger()
@@ -297,8 +289,8 @@ func (g *GithubIntegration) WebHook(webhook sdk.WebHook) error {
 	sdk.LogInfo(logger, "webhook received", "headers", webhook.Headers(), "event", event)
 	sig := webhook.Headers()["x-hub-signature"]
 	buf := webhook.Bytes()
-	if !verifyWebhookSignature(sig, g.manager.WebHookManager().Secret(), buf) {
-		sdk.LogWarn(logger, "webhook signature was invalid, not loading", "signature", sig)
+	if err := github.ValidateSignature(sig, buf, []byte(g.manager.WebHookManager().Secret())); err != nil {
+		sdk.LogWarn(logger, "webhook signature was invalid, not loading", "signature", sig, "err", err)
 		return nil
 	}
 	obj, err := github.ParseWebHook(event, buf)
