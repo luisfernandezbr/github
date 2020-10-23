@@ -5,7 +5,7 @@ import (
 	"github.com/pinpt/agent/v4/sdk"
 )
 
-func (g *GithubIntegration) fromPushEvent(logger sdk.Logger, client sdk.GraphQLClient, userManager *UserManager, control sdk.Control, customerID string, push *github.PushEvent) ([]*sdk.SourceCodeCommit, error) {
+func (g *GithubIntegration) fromPushEvent(logger sdk.Logger, userManager *UserManager, customerID string, push *github.PushEvent) ([]*sdk.SourceCodeCommit, error) {
 	commits := make([]*sdk.SourceCodeCommit, 0)
 	for _, c := range push.Commits {
 		var commit sdk.SourceCodeCommit

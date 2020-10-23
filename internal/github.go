@@ -11,7 +11,6 @@ import (
 // GithubIntegration is an integration for GitHub
 // easyjson:skip
 type GithubIntegration struct {
-	logger  sdk.Logger
 	config  sdk.Config
 	manager sdk.Manager
 	lock    sync.Mutex
@@ -23,10 +22,9 @@ var _ sdk.Integration = (*GithubIntegration)(nil)
 
 // Start is called when the integration is starting up
 func (g *GithubIntegration) Start(logger sdk.Logger, config sdk.Config, manager sdk.Manager) error {
-	g.logger = sdk.LogWith(logger, "pkg", "github")
 	g.config = config
 	g.manager = manager
-	sdk.LogInfo(g.logger, "starting")
+	sdk.LogInfo(logger, "starting")
 	return nil
 }
 
@@ -34,7 +32,7 @@ func (g *GithubIntegration) Start(logger sdk.Logger, config sdk.Config, manager 
 func (g *GithubIntegration) Enroll(instance sdk.Instance) error {
 	// attempt to add an org level web hook
 	started := time.Now()
-	logger := sdk.LogWith(g.logger, "customer_id", instance.CustomerID(), "integration_instance_id", instance.IntegrationInstanceID())
+	logger := instance.Logger()
 	sdk.LogInfo(logger, "enroll started")
 	config := instance.Config()
 	if config.IntegrationType == sdk.CloudIntegration && config.OAuth2Auth != nil {
@@ -47,7 +45,7 @@ func (g *GithubIntegration) Enroll(instance sdk.Instance) error {
 				continue
 			}
 			if acct.Type == sdk.ConfigAccountTypeOrg {
-				if err := g.registerOrgWebhook(g.manager.WebHookManager(), client, instance.CustomerID(), instance.IntegrationInstanceID(), login); err != nil {
+				if err := g.registerOrgWebhook(logger, g.manager.WebHookManager(), client, instance.CustomerID(), instance.IntegrationInstanceID(), login); err != nil {
 					g.manager.WebHookManager().Errored(instance.CustomerID(), instance.IntegrationInstanceID(), refType, login, sdk.WebHookScopeOrg, err)
 				}
 			}
@@ -59,7 +57,7 @@ func (g *GithubIntegration) Enroll(instance sdk.Instance) error {
 
 // Dismiss is called when an existing integration instance is removed
 func (g *GithubIntegration) Dismiss(instance sdk.Instance) error {
-	logger := sdk.LogWith(g.logger, "customer_id", instance.CustomerID(), "integration_instance_id", instance.IntegrationInstanceID())
+	logger := instance.Logger()
 	started := time.Now()
 	sdk.LogInfo(logger, "dismiss started")
 	config := instance.Config()

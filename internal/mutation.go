@@ -6,9 +6,7 @@ import (
 
 // Mutation is called when a mutation request is received on behalf of the integration
 func (g *GithubIntegration) Mutation(mutation sdk.Mutation) (*sdk.MutationResponse, error) {
-
-	logger := sdk.LogWith(mutation.Logger())
-
+	logger := mutation.Logger()
 	sdk.LogInfo(logger, "mutation request received", "action", mutation.Action(), "id", mutation.ID(), "model", mutation.Model())
 	switch mutation.Action() {
 	case sdk.CreateAction:
