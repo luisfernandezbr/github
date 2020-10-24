@@ -2,6 +2,7 @@ package internal
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/go-github/v32/github"
@@ -410,4 +411,200 @@ func (c *CreateIssue) toModel(logger sdk.Logger, userManager *UserManager, integ
 	projectID := sdk.NewWorkProjectID(customerID, c.Repository.ID, refType)
 	return issue.ToModel(logger, userManager, customerID, integrationInstanceID, c.Repository.NameWithOwner, projectID)
 
+}
+
+const updateIssueQuery = `mutation updateIssue($id: ID!, %s) {
+	updateIssue(input:{
+	  id: $id,
+	  %s
+	}) {
+	  issue {
+			  id
+			  title
+			  number
+			  url
+			  state
+			  repository {
+				  id
+				  nameWithOwner
+			  }
+			  createdAt
+			  updatedAt
+			  author {
+				  login
+			  }
+			  milestone {
+				  id
+			  }
+		  }
+	}
+  }
+  `
+
+func getUpdateQuery(includeTitle, includeMilestoneID, includeAssigneeIDs bool) string {
+
+	filters := make([]string, 0)
+	input := make([]string, 0)
+
+	if includeTitle {
+		filters = append(filters, "$title: String!")
+		input = append(input, "title: $title")
+	}
+
+	if includeMilestoneID {
+		filters = append(filters, "$epicID: ID!")
+		input = append(input, "milestoneId: $epicID")
+	}
+
+	if includeAssigneeIDs {
+		filters = append(filters, "$assignees: [ID!]")
+		input = append(input, "assigneeIds: $assignees")
+	}
+
+	return fmt.Sprintf(updateIssueQuery, strings.Join(filters, ", "), strings.Join(input, ", "))
+}
+
+type issueUpdateResponse struct {
+	Data struct {
+		CreateIssue struct {
+			Issue CreateIssue `json:"issue"`
+		} `json:"updateIssue"`
+	} `json:"data"`
+	Errors []struct {
+		Message string `json:"message"`
+	} `json:"errors"`
+}
+
+func (g *GithubIntegration) UpdateIssue(logger sdk.Logger, userManager *UserManager, issueRefID string, mutation *sdk.WorkIssueUpdateMutation, user sdk.MutationUser) (*sdk.MutationResponse, error) {
+
+	var c sdk.Config
+	c.APIKeyAuth = user.APIKeyAuth
+	c.BasicAuth = user.BasicAuth
+	c.OAuth2Auth = user.OAuth2Auth
+	_, client, err := g.newGraphClient(logger, c)
+	if err != nil {
+		return nil, fmt.Errorf("error creating http client: %w", err)
+	}
+
+	var workIssue *sdk.WorkIssue
+	var response *issueUpdateResponse
+
+	input, hasMutation := makeIssueUpdate(mutation)
+	if hasMutation {
+		input["id"] = issueRefID
+
+		query := getUpdateQuery(mutation.Set.Title != nil, mutation.Set.Epic != nil, mutation.Set.AssigneeRefID != nil)
+
+		sdk.LogDebug(logger, "sending issue update mutation", "input", input, "user", user.RefID)
+		if err := client.Query(query, input, &response); err != nil {
+			return nil, err
+		}
+
+		if len(response.Errors) > 0 {
+			return nil, fmt.Errorf("error creating issue %v", response.Errors)
+		}
+
+	}
+
+	if mutation.Unset.Assignee || mutation.Unset.Epic {
+		var err error
+		response, err = unsetIssueFieldsIfAny(logger, client, issueRefID, mutation)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	workIssue, err = response.Data.CreateIssue.Issue.toModel(logger, userManager, userManager.instanceid, userManager.customerID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &sdk.MutationResponse{
+		RefID:    sdk.StringPointer(issueRefID),
+		EntityID: sdk.StringPointer(workIssue.ID),
+		URL:      sdk.StringPointer(workIssue.URL),
+	}, nil
+}
+
+func makeIssueUpdate(event *sdk.WorkIssueUpdateMutation) (input map[string]interface{}, hasMutation bool) {
+
+	input = make(map[string]interface{})
+
+	if event.Set.Title != nil {
+		input["title"] = *event.Set.Title
+		hasMutation = true
+	}
+
+	if event.Set.Epic != nil {
+		input["epicID"] = *event.Set.Epic.RefID
+		hasMutation = true
+	}
+
+	if event.Set.AssigneeRefID != nil {
+		input["assignees"] = *event.Set.AssigneeRefID
+		hasMutation = true
+	}
+
+	return input, hasMutation
+}
+
+const unsetIssueQuery = `mutation updateIssue($id: ID!){
+	updateIssue(input:{
+	  id:$id,
+	  %s
+	}) {
+		issue {
+			id
+			title
+			number
+			url
+			state
+			repository {
+				id
+				nameWithOwner
+			}
+			createdAt
+			updatedAt
+			author {
+				login
+			}
+			milestone {
+				id
+			}
+		}
+	}
+  }
+`
+
+func unsetIssueFieldsIfAny(logger sdk.Logger, client sdk.GraphQLClient, issueRefID string, mutation *sdk.WorkIssueUpdateMutation) (*issueUpdateResponse, error) {
+
+	var filters string
+
+	if mutation.Unset.Epic && mutation.Unset.Assignee {
+		filters = `assigneeIds: [], milestoneId: null`
+	} else if mutation.Unset.Epic {
+		filters = `milestoneId: null`
+	} else if mutation.Unset.Assignee {
+		filters = `assigneeIds: []`
+	} else {
+		return nil, nil // nothing to update
+	}
+
+	query := fmt.Sprintf(unsetIssueQuery, filters)
+
+	input := make(map[string]interface{})
+	input["id"] = issueRefID
+
+	var r issueUpdateResponse
+
+	err := client.Query(query, input, &r)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(r.Errors) > 0 {
+		return nil, fmt.Errorf("error updating issue %v", r.Errors)
+	}
+
+	return &r, nil
 }
