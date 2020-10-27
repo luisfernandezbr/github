@@ -193,6 +193,49 @@ func (r repository) ToProjectCapabilityModel(state sdk.State, repo *sdk.SourceCo
 	capability.Resolutions = false
 	capability.Sprints = false
 	capability.StoryPoints = false
+	capability.IssueMutationFields = createMutationFields(r.Labels.Nodes)
 	state.SetWithExpires(cacheKey, 1, time.Hour*24*30)
 	return &capability
+}
+
+func createMutationFields(labels []label) []sdk.WorkProjectCapabilityIssueMutationFields {
+
+	labelRefID := make([]string, 0)
+	for _, l := range labels {
+		labelRefID = append(labelRefID, l.ID)
+	}
+
+	return []sdk.WorkProjectCapabilityIssueMutationFields{
+		{
+			Name:           "Title",
+			Description:    sdk.StringPointer("title of the issue"),
+			AlwaysRequired: true,
+			RefID:          "title",
+			Immutable:      false,
+			Type:           sdk.WorkProjectCapabilityIssueMutationFieldsTypeString,
+		}, {
+			Name:           "Description",
+			Description:    sdk.StringPointer("description of the issue"),
+			AlwaysRequired: true,
+			RefID:          "description",
+			Immutable:      false,
+			Type:           sdk.WorkProjectCapabilityIssueMutationFieldsTypeString,
+		}, {
+			Name:           "IssueType",
+			Description:    sdk.StringPointer("description of the issue"),
+			AlwaysRequired: true,
+			RefID:          "issuetype",
+			Immutable:      false,
+			AvailableForTypes: append([]string{
+				"",
+				"epic",
+			}, labelRefID...),
+			RequiredByTypes: append([]string{
+				"",
+				"epic",
+			}, labelRefID...),
+			Type: sdk.WorkProjectCapabilityIssueMutationFieldsTypeWorkIssueType,
+		},
+	}
+
 }

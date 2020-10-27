@@ -13,10 +13,7 @@ func (g *GithubIntegration) Mutation(mutation sdk.Mutation) (*sdk.MutationRespon
 	case sdk.CreateAction:
 		switch v := mutation.Payload().(type) {
 		case *sdk.WorkIssueCreateMutation:
-			switch *v.Type.Name {
-			case "Bug":
-				return g.createIssue(logger, userManager, v, mutation.User())
-			}
+			return g.createIssue(logger, userManager, v, mutation.User())
 		}
 		break
 	case sdk.UpdateAction:
