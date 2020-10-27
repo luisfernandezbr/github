@@ -332,6 +332,35 @@ const createIssueQuery = `mutation createIssue($repositoryID: ID!,$title: String
 	}
   }`
 
+const createIssueQueryWithLabels = `mutation createIssue($repositoryID: ID!, $title: String!, $body: String!, $label: ID!) {
+	createIssue(input:{
+	  repositoryId:$repositoryID,
+	  title:$title,
+	  body:$body,
+	  labelIds:[$label]
+	}) {
+	  issue{
+		id
+		title
+		number
+		url
+		state
+		repository {
+			id
+			nameWithOwner
+		}
+		createdAt
+		updatedAt
+		author {
+			login
+		}
+		milestone {
+			id
+		}
+	  }
+	}
+  }`
+
 func (g *GithubIntegration) createIssue(logger sdk.Logger, userManager *UserManager, mutation *sdk.WorkIssueCreateMutation, user sdk.MutationUser) (*sdk.MutationResponse, error) {
 
 	var c sdk.Config
@@ -342,12 +371,44 @@ func (g *GithubIntegration) createIssue(logger sdk.Logger, userManager *UserMana
 	if err != nil {
 		return nil, fmt.Errorf("error creating http client: %w", err)
 	}
+	_, httpClient, err := g.newHTTPClient(logger, c)
+	if err != nil {
+		return nil, fmt.Errorf("error creating http client: %w", err)
+	}
 
-	input, err := makeCreateMutation(logger, mutation.ProjectRefID, mutation.Fields)
+	input, issueType, err := makeCreateMutation(logger, *mutation.Project.RefID, mutation.Fields)
 	if err != nil {
 		return nil, err
 	}
 
+	var workIssue *sdk.WorkIssue
+
+	switch issueType {
+	case "":
+		workIssue, err = createIssue(logger, client, input, userManager, "")
+		if err != nil {
+			return nil, err
+		}
+	case "epic":
+		workIssue, err = createMilestone(logger, httpClient, userManager, input, mutation.Project)
+		if err != nil {
+			return nil, err
+		}
+	default:
+		workIssue, err = createIssue(logger, client, input, userManager, issueType)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &sdk.MutationResponse{
+		RefID:    sdk.StringPointer(workIssue.RefID),
+		EntityID: sdk.StringPointer(workIssue.ID),
+		URL:      sdk.StringPointer(workIssue.URL),
+	}, nil
+}
+
+func createIssue(logger sdk.Logger, client sdk.GraphQLClient, input map[string]interface{}, userManager *UserManager, labelID string) (*sdk.WorkIssue, error) {
 	var response struct {
 		Data struct {
 			CreateIssue struct {
@@ -359,116 +420,79 @@ func (g *GithubIntegration) createIssue(logger sdk.Logger, userManager *UserMana
 		} `json:"errors"`
 	}
 
-	sdk.LogDebug(logger, "sending issue creation mutation", "input", input, "user", user.RefID)
-	if err := client.Query(createIssueQuery, input, &response); err != nil {
-		return nil, err
+	sdk.LogDebug(logger, "sending issue creation mutation", "input", input)
+	if labelID == "" {
+		if err := client.Query(createIssueQuery, input, &response); err != nil {
+			return nil, err
+		}
+	} else {
+		input["label"] = labelID
+		if err := client.Query(createIssueQueryWithLabels, input, &response); err != nil {
+			return nil, err
+		}
 	}
 
 	if len(response.Errors) > 0 {
 		return nil, fmt.Errorf("error creating issue %v", response.Errors)
 	}
 
-	workIssue, err := response.Data.CreateIssue.Issue.toModel(logger, userManager, userManager.instanceid, userManager.customerID)
-	if err != nil {
-		return nil, err
-	}
-
-	return &sdk.MutationResponse{
-		RefID:    sdk.StringPointer(response.Data.CreateIssue.Issue.RefID),
-		EntityID: sdk.StringPointer(workIssue.ID),
-		URL:      sdk.StringPointer(workIssue.URL),
-	}, nil
+	return response.Data.CreateIssue.Issue.toModel(logger, userManager, userManager.instanceid, userManager.customerID)
 }
 
-func makeCreateMutation(logger sdk.Logger, projectRefID string, fields []sdk.MutationFieldValue) (map[string]interface{}, error) {
-	if projectRefID == "" {
-		return nil, errors.New("project ref id cannot be empty")
+func getRefID(val sdk.MutationFieldValue) (string, error) {
+	nameID, err := val.AsNameRefID()
+	if err != nil {
+		return "", fmt.Errorf("error decoding %s field as NameRefID: %w", val.Type.String(), err)
 	}
+	if nameID.RefID == nil {
+		return "", errors.New("ref_id was omitted")
+	}
+	return *nameID.RefID, nil
+}
+
+func makeCreateMutation(logger sdk.Logger, projectRefID string, fields []sdk.MutationFieldValue) (map[string]interface{}, string, error) {
+
+	if projectRefID == "" {
+		return nil, "", errors.New("project ref id cannot be empty")
+	}
+
 	params := make(map[string]interface{})
 	params["repositoryID"] = projectRefID
+
+	var issueType string
+
 	for _, fieldVal := range fields {
-		// var notFound bool
-		// First: try to handle the fields that are built in
 		switch fieldVal.RefID {
-		// case "issuetype":
-		// 	issueType, err := getRefID(fieldVal)
-		// 	if err != nil {
-		// 		return nil, fmt.Errorf("error decoding issue type field: %w", err)
-		// 	}
-		// 	createMutation.Fields["issuetype"] = idValue{issueType}
+		case "issueType":
+			iType, err := getRefID(fieldVal)
+			if err != nil {
+				return nil, "", fmt.Errorf("error decoding issue type field: %w", err)
+			}
+			issueType = iType
 		case "title":
 			title, err := fieldVal.AsString()
 			if err != nil {
-				return nil, fmt.Errorf("error decoding title field: %w", err)
+				return nil, "", fmt.Errorf("error decoding title field: %w", err)
 			}
-			// createMutation.Fields["summary"] = title
 			params["title"] = title
 		case "body":
 			description, err := fieldVal.AsString()
 			if err != nil {
-				return nil, fmt.Errorf("error decoding description field: %w", err)
+				return nil, "", fmt.Errorf("error decoding description field: %w", err)
 			}
 			params["body"] = description
-			// createMutation.Fields["description"] = adf.Node{
-			// 	Type:    "doc",
-			// 	Version: 1,
-			// 	Content: []adf.Node{
-			// 		{
-			// 			Type: "paragraph",
-			// 			Content: []adf.Node{
-			// 				{
-			// 					Text: description,
-			// 					Type: "text",
-			// 				},
-			// 			},
-			// 		},
-			// 	},
-			// }
-			// case "assignee":
-			// 	assigneeRefID, err := getRefID(fieldVal)
-			// 	if err != nil {
-			// 		return nil, fmt.Errorf("error decoding assignee refID: %w", err)
-			// 	}
-			// 	createMutation.Fields["assignee"] = idValue{assigneeRefID}
-			// case "priority":
-			// 	priorityRefID, err := getRefID(fieldVal)
-			// 	if err != nil {
-			// 		return nil, fmt.Errorf("error decoding priority refID: %w", err)
-			// 	}
-			// 	createMutation.Fields["priority"] = idValue{priorityRefID}
-			// 	// TODO(robin): components, labels
-			// default:
-			// 	notFound = true
-			// }
-			// if notFound {
-			// 	// Second: try to dynamically handle any other fields
-			// 	switch fieldVal.Type {
-			// 	case sdk.WorkProjectCapabilityIssueMutationFieldsTypeNumber:
-			// 		num, err := fieldVal.AsNumber()
-			// 		if err != nil {
-			// 			return nil, fmt.Errorf("error decoding number field: %w", err)
-			// 		}
-			// 		createMutation.Fields[fieldVal.RefID] = num
-			// 	case sdk.WorkProjectCapabilityIssueMutationFieldsTypeString, sdk.WorkProjectCapabilityIssueMutationFieldsTypeTextbox:
-			// 		str, err := fieldVal.AsString()
-			// 		if err != nil {
-			// 			return nil, fmt.Errorf("error decoding string field: %w", err)
-			// 		}
-			// 		createMutation.Fields[fieldVal.RefID] = str
-			// 	case sdk.WorkProjectCapabilityIssueMutationFieldsTypeEpic:
-			// 		nrid, err := fieldVal.AsNameRefID()
-			// 		if err != nil {
-			// 			return nil, fmt.Errorf("error decoding epic link: %w", err)
-			// 		}
-			// 		if nrid.Name != nil {
-			// 			return nil, fmt.Errorf("linked epic was omitted")
-			// 		}
-			// 		createMutation.Fields[fieldVal.RefID] = *nrid.Name
-			// 		// TODO(robin): sprint, string array
-			// 	}
+		case "epicDueDate":
+			date, err := fieldVal.AsDate()
+			if err != nil {
+				return nil, "", fmt.Errorf("error decoding due date field: %w", err)
+			}
+
+			d := sdk.DateFromEpoch(date.Epoch)
+
+			params["due_on"] = d.Format("2006-01-02T15:04:05Z")
 		}
 	}
-	return params, nil
+	return params, issueType, nil
 }
 
 // CreateIssue create issue

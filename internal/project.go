@@ -222,9 +222,9 @@ func createMutationFields(labels []label) []sdk.WorkProjectCapabilityIssueMutati
 			Type:           sdk.WorkProjectCapabilityIssueMutationFieldsTypeString,
 		}, {
 			Name:           "IssueType",
-			Description:    sdk.StringPointer("description of the issue"),
+			Description:    sdk.StringPointer("issue type"),
 			AlwaysRequired: true,
-			RefID:          "issuetype",
+			RefID:          "issueType",
 			Immutable:      false,
 			AvailableForTypes: append([]string{
 				"",
@@ -235,6 +235,20 @@ func createMutationFields(labels []label) []sdk.WorkProjectCapabilityIssueMutati
 				"epic",
 			}, labelRefID...),
 			Type: sdk.WorkProjectCapabilityIssueMutationFieldsTypeWorkIssueType,
+		},
+		{
+			Name:           "EpicDueDate",
+			Description:    sdk.StringPointer("milestone due date"),
+			AlwaysRequired: false,
+			RefID:          "epicDueDate",
+			Immutable:      false,
+			AvailableForTypes: append([]string{
+				"epic",
+			}),
+			RequiredByTypes: append([]string{
+				"epic",
+			}),
+			Type: sdk.WorkProjectCapabilityIssueMutationFieldsTypeDate,
 		},
 	}
 
