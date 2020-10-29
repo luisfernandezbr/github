@@ -19,10 +19,10 @@ type repoProjectCardContent struct {
 }
 
 type repoProjectCard struct {
-	ID      string                 `json:"id"`
-	State   string                 `json:"state"`
-	Note    string                 `json:"note"`
-	Content repoProjectCardContent `json:"content"`
+	ID      string                  `json:"id"`
+	State   string                  `json:"state"`
+	Note    string                  `json:"note"`
+	Content *repoProjectCardContent `json:"content"`
 }
 
 type repoProjectCardNodes struct {
@@ -113,9 +113,11 @@ func (p repoProject) ToModel(logger sdk.Logger, customerID string, integrationIn
 		col.Name = c.Name
 		col.IssueIds = make([]string, 0)
 		for _, o := range c.Cards.Nodes {
-			id := sdk.NewWorkIssueID(customerID, o.Content.ID, refType)
-			col.IssueIds = append(col.IssueIds, id)
-			kanban.IssueIds = append(kanban.IssueIds, id)
+			if o.Content != nil {
+				id := sdk.NewWorkIssueID(customerID, o.Content.ID, refType)
+				col.IssueIds = append(col.IssueIds, id)
+				kanban.IssueIds = append(kanban.IssueIds, id)
+			}
 		}
 		kanban.Columns = append(kanban.Columns, col)
 		var bcol sdk.AgileBoardColumns
