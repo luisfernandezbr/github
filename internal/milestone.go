@@ -14,6 +14,7 @@ type milestoneCommon struct {
 	Description string     `json:"description"`
 	Number      int        `json:"number"`
 	URL         string     `json:"url"`
+	HTMLUrl     string     `json:"html_url"`
 	Closed      bool       `json:"closed"`
 	CreatedAt   time.Time  `json:"createdAt"`
 	UpdatedAt   time.Time  `json:"updatedAt"`
@@ -28,7 +29,7 @@ func (m milestoneCommon) ToModel(logger sdk.Logger, userManager *UserManager, cu
 	issue.IntegrationInstanceID = sdk.StringPointer(integrationInstanceID)
 	issue.RefType = refType
 	issue.Identifier = fmt.Sprintf("%s#%d", m.Title, m.Number)
-	issue.URL = m.URL
+	issue.URL = m.HTMLUrl
 	issue.Title = m.Title
 	issue.Description = toHTML(m.Description)
 	issue.ProjectIds = []string{projectID}

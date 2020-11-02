@@ -475,7 +475,7 @@ func makeCreateMutation(logger sdk.Logger, projectRefID string, fields []sdk.Mut
 				return nil, "", fmt.Errorf("error decoding title field: %w", err)
 			}
 			params["title"] = title
-		case "body":
+		case "description":
 			description, err := fieldVal.AsString()
 			if err != nil {
 				return nil, "", fmt.Errorf("error decoding description field: %w", err)
