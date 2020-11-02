@@ -158,10 +158,12 @@ func (r repository) ToProjectModel(repo *sdk.SourceCodeRepo) *sdk.WorkProject {
 	}
 
 	for _, l := range r.Labels.Nodes {
-		issueTypes = append(issueTypes, sdk.WorkProjectIssueTypes{
-			Name:  strings.Title(l.Name),
-			RefID: l.ID,
-		})
+		if l.Name == "bug" || l.Name == "enhancement" {
+			issueTypes = append(issueTypes, sdk.WorkProjectIssueTypes{
+				Name:  strings.Title(l.Name),
+				RefID: l.ID,
+			})
+		}
 	}
 
 	project.IssueTypes = issueTypes
@@ -208,7 +210,9 @@ func createMutationFields(labels []label) []sdk.WorkProjectCapabilityIssueMutati
 
 	labelRefID := make([]string, 0)
 	for _, l := range labels {
-		labelRefID = append(labelRefID, l.ID)
+		if l.Name == "bug" || l.Name == "enhancement" {
+			labelRefID = append(labelRefID, l.ID)
+		}
 	}
 
 	commonIssueTypes := []string{"epic", ""}
