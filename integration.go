@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/pinpt/github/internal"
 	"github.com/pinpt/agent/v4/runner"
+	"github.com/pinpt/github/internal"
 )
 
 // Integration is used to export the integration

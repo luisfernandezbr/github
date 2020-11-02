@@ -145,24 +145,27 @@ func (r repository) ToProjectModel(repo *sdk.SourceCodeRepo) *sdk.WorkProject {
 	project.IntegrationInstanceID = repo.IntegrationInstanceID
 	project.CustomerID = repo.CustomerID
 	project.UpdatedAt = repo.UpdatedAt
-	project.IssueTypes = []sdk.WorkProjectIssueTypes{
+
+	issueTypes := []sdk.WorkProjectIssueTypes{
 		{
 			Name:  "Epic",
 			RefID: "epic",
 		},
 		{
 			Name:  "Task",
-			RefID: "task",
-		},
-		{
-			Name:  "Bug",
-			RefID: "bug",
-		},
-		{
-			Name:  "Enhancement",
-			RefID: "enhancement",
+			RefID: "",
 		},
 	}
+
+	for _, l := range r.Labels.Nodes {
+		issueTypes = append(issueTypes, sdk.WorkProjectIssueTypes{
+			Name:  strings.Title(l.Name),
+			RefID: l.ID,
+		})
+	}
+
+	project.IssueTypes = issueTypes
+
 	return &project
 }
 
@@ -179,6 +182,7 @@ func (r repository) ToProjectCapabilityModel(state sdk.State, repo *sdk.SourceCo
 	var capability sdk.WorkProjectCapability
 	capability.CustomerID = repo.CustomerID
 	capability.RefID = repo.RefID
+	capability.Active = true
 	capability.RefType = repo.RefType
 	capability.IntegrationInstanceID = repo.IntegrationInstanceID
 	capability.ProjectID = sdk.NewWorkProjectID(repo.CustomerID, repo.RefID, refType)
@@ -207,50 +211,49 @@ func createMutationFields(labels []label) []sdk.WorkProjectCapabilityIssueMutati
 		labelRefID = append(labelRefID, l.ID)
 	}
 
+	commonIssueTypes := []string{"epic", ""}
+
 	return []sdk.WorkProjectCapabilityIssueMutationFields{
 		{
-			Name:           "Title",
-			Description:    sdk.StringPointer("title of the issue"),
-			AlwaysRequired: true,
-			RefID:          "title",
-			Immutable:      false,
-			Type:           sdk.WorkProjectCapabilityIssueMutationFieldsTypeString,
+			AlwaysAvailable:   true,
+			Name:              "Title",
+			Description:       sdk.StringPointer("title of the issue"),
+			AlwaysRequired:    true,
+			RefID:             "title",
+			Immutable:         false,
+			Type:              sdk.WorkProjectCapabilityIssueMutationFieldsTypeString,
+			AvailableForTypes: append(commonIssueTypes, labelRefID...),
+			RequiredByTypes:   append(commonIssueTypes, labelRefID...),
 		}, {
-			Name:           "Description",
-			Description:    sdk.StringPointer("description of the issue"),
-			AlwaysRequired: true,
-			RefID:          "description",
-			Immutable:      false,
-			Type:           sdk.WorkProjectCapabilityIssueMutationFieldsTypeString,
+			AlwaysAvailable:   true,
+			Name:              "Description",
+			Description:       sdk.StringPointer("description of the issue"),
+			AlwaysRequired:    true,
+			RefID:             "description",
+			Immutable:         false,
+			Type:              sdk.WorkProjectCapabilityIssueMutationFieldsTypeTextbox,
+			AvailableForTypes: append(commonIssueTypes, labelRefID...),
+			RequiredByTypes:   append(commonIssueTypes, labelRefID...),
 		}, {
-			Name:           "IssueType",
-			Description:    sdk.StringPointer("issue type"),
-			AlwaysRequired: true,
-			RefID:          "issueType",
-			Immutable:      false,
-			AvailableForTypes: append([]string{
-				"",
-				"epic",
-			}, labelRefID...),
-			RequiredByTypes: append([]string{
-				"",
-				"epic",
-			}, labelRefID...),
-			Type: sdk.WorkProjectCapabilityIssueMutationFieldsTypeWorkIssueType,
+			AlwaysAvailable:   true,
+			Name:              "IssueType",
+			Description:       sdk.StringPointer("issue type"),
+			AlwaysRequired:    true,
+			RefID:             "issueType",
+			Immutable:         false,
+			AvailableForTypes: append(commonIssueTypes, labelRefID...),
+			RequiredByTypes:   append(commonIssueTypes, labelRefID...),
+			Type:              sdk.WorkProjectCapabilityIssueMutationFieldsTypeWorkIssueType,
 		},
 		{
-			Name:           "EpicDueDate",
-			Description:    sdk.StringPointer("milestone due date"),
-			AlwaysRequired: false,
-			RefID:          "epicDueDate",
-			Immutable:      false,
-			AvailableForTypes: append([]string{
-				"epic",
-			}),
-			RequiredByTypes: append([]string{
-				"epic",
-			}),
-			Type: sdk.WorkProjectCapabilityIssueMutationFieldsTypeDate,
+			AlwaysAvailable:   false,
+			Name:              "EpicDueDate",
+			Description:       sdk.StringPointer("milestone due date"),
+			AlwaysRequired:    false,
+			RefID:             "epicDueDate",
+			Immutable:         false,
+			AvailableForTypes: append([]string{"epic"}),
+			Type:              sdk.WorkProjectCapabilityIssueMutationFieldsTypeDate,
 		},
 	}
 

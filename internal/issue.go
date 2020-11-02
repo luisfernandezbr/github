@@ -384,7 +384,7 @@ func (g *GithubIntegration) createIssue(logger sdk.Logger, userManager *UserMana
 	var workIssue *sdk.WorkIssue
 
 	switch issueType {
-	case "":
+	case "bug":
 		workIssue, err = createIssue(logger, client, input, userManager, "")
 		if err != nil {
 			return nil, err
