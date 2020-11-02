@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/google/go-github/v32/github"
@@ -11,8 +12,7 @@ func isBot(name string) bool {
 	return strings.HasSuffix(name, "[bot]") || strings.HasSuffix(name, "-bot") || strings.HasSuffix(name, " Bot") || name == "GitHub"
 }
 
-type author struct {
-	ID     string `json:"id"`
+type authorCommon struct {
 	Email  string `json:"email"`
 	Name   string `json:"name"`
 	Avatar string `json:"avatarUrl"`
@@ -21,10 +21,22 @@ type author struct {
 	Type   string `json:"type"`
 }
 
-func (a author) ToModel(customerID string, integrationInstanceID string) *sdk.SourceCodeUser {
+func (a authorCommon) RefID(customerID string) string {
+	// FIXME: review how we do this in current agent to match
+	switch a.Type {
+	case "Bot":
+		return ""
+	case "Mannequin":
+	}
+	if a.Email != "" {
+		return sdk.Hash(customerID, a.Email)
+	}
+	return "" // FIXME
+}
+
+func (a authorCommon) ToModel(customerID string, integrationInstanceID string) *sdk.SourceCodeUser {
 	user := &sdk.SourceCodeUser{}
 	user.CustomerID = customerID
-	user.RefID = a.RefID(customerID)
 	user.RefType = refType
 	user.ID = sdk.NewSourceCodeUserID(customerID, refType, user.RefID)
 	user.IntegrationInstanceID = sdk.StringPointer(integrationInstanceID)
@@ -52,19 +64,48 @@ func (a author) ToModel(customerID string, integrationInstanceID string) *sdk.So
 	return user
 }
 
+type author struct {
+	authorCommon
+	ID string `json:"id"`
+}
+
+type author2 struct {
+	authorCommon
+	ID int64 `json:"id"`
+}
+
+func (a author) ToModel(customerID string, integrationInstanceID string) *sdk.SourceCodeUser {
+	u := a.authorCommon.ToModel(customerID, integrationInstanceID)
+
+	u.RefID = a.RefID(customerID)
+
+	return u
+}
+
+func (a author2) ToModel(customerID string, integrationInstanceID string) *sdk.SourceCodeUser {
+	u := a.authorCommon.ToModel(customerID, integrationInstanceID)
+
+	u.RefID = a.RefID(customerID)
+
+	return u
+}
+
 func (a author) RefID(customerID string) string {
+
 	// FIXME: review how we do this in current agent to match
-	switch a.Type {
-	case "Bot":
-		return ""
-	case "User":
+	if a.Type == "User" {
 		return a.ID
-	case "Mannequin":
 	}
-	if a.Email != "" {
-		return sdk.Hash(customerID, a.Email)
+	return a.authorCommon.RefID(customerID)
+}
+
+func (a author2) RefID(customerID string) string {
+	// FIXME: review how we do this in current agent to match
+	if a.Type == "User" {
+		return strconv.FormatInt(a.ID, 10)
 	}
-	return "" // FIXME
+	return a.authorCommon.RefID(customerID)
+
 }
 
 type gitUser struct {

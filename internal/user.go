@@ -29,13 +29,26 @@ func (u *UserManager) emitAuthor(logger sdk.Logger, author author) error {
 	if refID == "" {
 		return nil
 	}
+	user := author.ToModel(u.customerID, u.instanceid)
+	return u.emitAuthorCommon(refID, user)
+}
+
+func (u *UserManager) emitAuthor2(logger sdk.Logger, author author2) error {
+	refID := author.RefID(u.customerID)
+	if refID == "" {
+		return nil
+	}
+	user := author.ToModel(u.customerID, u.instanceid)
+	return u.emitAuthorCommon(refID, user)
+}
+
+func (u *UserManager) emitAuthorCommon(refID string, user *sdk.SourceCodeUser) error {
 	// hold lock while we determine if this is a user we need to lookup
 	u.mu.Lock()
 	if u.users[refID] {
 		u.mu.Unlock()
 		return nil
 	}
-	user := author.ToModel(u.customerID, u.instanceid)
 	hash := user.Hash()
 	cachekey := userStatecacheKey + refID
 	u.users[refID] = true
