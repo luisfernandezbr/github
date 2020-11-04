@@ -1,7 +1,7 @@
 name: GitHub
 ref_type: github
 description: This is the official GitHub integration for Pinpoint
-avatar_url: "https://img.icons8.com/color/240/000000/github--v1.png"
+avatar_url: https://pinpoint.com/images/integrations/GitHub.svg
 capabilities:
   - agent.Mutation
   - auth.OAuth2
