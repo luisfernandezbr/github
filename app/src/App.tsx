@@ -11,10 +11,10 @@ function App() {
 			tags: ['Source Code Management', 'Issue Management'],
 			installed: false,
 			refType: 'github',
-			icon: 'https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png',
+			icon: 'https://pinpoint.com/images/integrations/GitHub.svg',
 			publisher: {
 				name: 'Pinpoint',
-				avatar: 'https://avatars0.githubusercontent.com/u/24400526?s=200&v=4',
+				avatar: 'https://pinpoint.com/logo/logomark/blue.png',
 				url: 'https://pinpoint.com'
 			},
 			uiURL: window.location.href
