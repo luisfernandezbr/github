@@ -31,3 +31,4 @@ installation:
     authorizations:
       - oauth2
       - apikey
+user_scope: global
